@@ -131,14 +131,16 @@ public class JetService
     // End ManagedService
 
 
-    public void initExecution(long executionId, ExecutionPlan plan) {
+    public void initExecution(long executionId, Address coordinatorAddr, ExecutionPlan plan) {
         final ExecutionContext[] created = {null};
         try {
             executionContexts.compute(executionId, (k, v) -> {
                 if (v != null) {
                     throw new IllegalStateException("Execution context " + executionId + " already exists");
                 }
-                return (created[0] = new ExecutionContext(executionId, nodeEngine, executionService)).initialize(plan);
+                return (created[0] = new ExecutionContext(executionId, coordinatorAddr, nodeEngine, executionService))
+                        .initialize
+                        (plan);
             });
         } catch (Throwable t) {
             if (created[0] != null) {

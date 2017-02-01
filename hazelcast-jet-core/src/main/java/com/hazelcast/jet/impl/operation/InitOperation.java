@@ -46,7 +46,7 @@ class InitOperation extends Operation {
     public void run() throws Exception {
         getLogger().fine("Initializing execution plan for job " + executionId + ".");
         JetService service = getService();
-        service.initExecution(executionId, planSupplier.get());
+        service.initExecution(executionId, getCallerAddress(), planSupplier.get());
         getLogger().fine("Execution plan for job " + executionId + " initialized.");
     }
 

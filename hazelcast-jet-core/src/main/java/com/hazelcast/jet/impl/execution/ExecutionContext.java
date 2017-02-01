@@ -49,10 +49,12 @@ public class ExecutionContext {
 
     private final long executionId;
     private final NodeEngine nodeEngine;
+    private final Address coordinatorAddr;
     private final ExecutionService execService;
 
-    public ExecutionContext(long executionId, NodeEngine nodeEngine, ExecutionService execService) {
+    public ExecutionContext(long executionId, Address coordinatorAddr, NodeEngine nodeEngine, ExecutionService execService) {
         this.executionId = executionId;
+        this.coordinatorAddr = coordinatorAddr;
         this.execService = execService;
         this.nodeEngine = nodeEngine;
     }
