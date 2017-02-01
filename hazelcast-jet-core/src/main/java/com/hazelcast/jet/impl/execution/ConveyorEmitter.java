@@ -28,11 +28,13 @@ public class ConveyorEmitter implements InboundEmitter {
     private final ConcurrentConveyor<Object> conveyor;
     private final int queueIndex;
     private final IntConsumer drained;
+    private final int capacity;
 
     public ConveyorEmitter(ConcurrentConveyor<Object> conveyor, int queueIndex, IntConsumer drained) {
         this.conveyor = conveyor;
         this.queueIndex = queueIndex;
         this.drained = drained;
+        this.capacity = conveyor.queue(queueIndex).capacity();
     }
 
     @Override
@@ -40,7 +42,8 @@ public class ConveyorEmitter implements InboundEmitter {
         doneDetector.wrapped = dest;
         try {
             int drainedCount = conveyor.drainTo(queueIndex, doneDetector);
-            drained.accept(drainedCount);
+            int prctFull = 100 * drainedCount / capacity;
+            drained.accept(prctFull);
             return ProgressState.valueOf(drainedCount > 0, doneDetector.done);
         } finally {
             doneDetector.wrapped = null;

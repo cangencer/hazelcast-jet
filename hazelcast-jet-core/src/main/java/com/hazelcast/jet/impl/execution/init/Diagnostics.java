@@ -16,7 +16,6 @@
 
 package com.hazelcast.jet.impl.execution.init;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicIntegerArray;
@@ -47,29 +46,63 @@ public class Diagnostics {
         }
 
         public int localInFlightItems() {
-            return 0;
+            int sum = 0;
+            int count = 0;
+            for (AtomicIntegerArray conveyor : localConveyors) {
+                for (int j = 0; j < conveyor.length() - (isDistributed() ? 1 : 0); j++) {
+                    sum += conveyor.get(j);
+                    count++;
+                }
+            }
+            return sum / count;
         }
 
         public int itemsToSenders() {
-            return 0;
+            if (!isDistributed()) {
+                return -1;
+            }
+
+            int sum = 0;
+            int count = 0;
+            for (AtomicIntegerArray senderConveyor : senderConveyors) {
+                for (int i = 0; i < senderConveyor.length(); i++) {
+                    sum += senderConveyor.get(i);
+                    count++;
+                }
+            }
+            return sum / count;
         }
 
         public int itemsFromReceiver() {
-            return 0;
+            if (!isDistributed()) {
+                return -1;
+            }
+            int sum = 0;
+            for (AtomicIntegerArray conveyor : localConveyors) {
+                sum += conveyor.get(conveyor.length() - 1);
+            }
+            return sum / localConveyors.length;
+        }
+
+        private boolean isDistributed() {
+            return senderConveyors != null;
         }
 
         @Override public String toString() {
-            return "EdgeD{" +
-                    "id='" + id + '\'' +
-                    ", source='" + source + '\'' +
-                    ", destination='" + destination + '\'' +
-                    ", localConveyors=" + Arrays.toString(localConveyors) +
-                    ", senderConveyors=" + Arrays.toString(senderConveyors) +
-                    '}';
+            if (isDistributed()) {
+                return source + "->" + destination + "\t\t l:" + localInFlightItems() + " s:" + itemsToSenders() + " r:" +
+                        itemsFromReceiver();
+            }
+            return source + "->" + destination + "\t\t l:" + localInFlightItems();
         }
     }
 
-    @Override public String toString() {
-        return edges.toString();
+    @Override
+    public String toString() {
+        StringBuilder builder = new StringBuilder();
+        for (EdgeD edgeD : edges.values()) {
+            builder.append(edgeD.toString()).append("\n");
+        }
+        return builder.toString();
     }
 }
