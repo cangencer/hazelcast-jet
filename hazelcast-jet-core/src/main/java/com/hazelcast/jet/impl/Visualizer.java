@@ -1,10 +1,11 @@
 package com.hazelcast.jet.impl;
 
 import com.hazelcast.jet.impl.execution.init.Diagnostics;
-import com.hazelcast.jet.impl.execution.init.Diagnostics.EdgeD;
+import com.hazelcast.jet.impl.execution.init.Diagnostics.DiagData;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.Map.Entry;
 
 import static javax.swing.WindowConstants.EXIT_ON_CLOSE;
 
@@ -51,15 +52,15 @@ public class Visualizer {
         }
 
         void update() {
-            for (EdgeD edgeD : diagnostics.edges.values()) {
-                int prctFull = edgeD.localInFlightItems();
+            for (Entry<String, DiagData> e : diagnostics.aggrData().entrySet()) {
+                int prctFull = e.getValue().localUtilization;
                 Color color =
                           prctFull > 90 ? Color.RED
                         : prctFull > 50 ? Color.ORANGE
                         : prctFull > 25 ? Color.PINK
                         : prctFull > 5 ? Color.BLUE
                         : Color.BLACK;
-                image.setPropertiesFor(edgeD.name(), 2, color);
+                image.setPropertiesFor(e.getKey(), 2, color);
             }
             repaint();
         }

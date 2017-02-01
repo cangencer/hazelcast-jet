@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicIntegerArray;
 
 public class Diagnostics implements Serializable {
 
-    public Map<String, EdgeD> edges = new HashMap<>();
+    public final Map<String, EdgeD> edges = new HashMap<>();
 
     public Map<Address, Map<String, DiagData>> remoteData = new ConcurrentHashMap<>();
 
@@ -57,7 +57,11 @@ public class Diagnostics implements Serializable {
         return aggrData;
     }
 
-    private DiagData aggregate(List<DiagData> data) {
+    public void clear() {
+        edges.forEach((x, e) -> e.clear());
+    }
+
+    private static DiagData aggregate(List<DiagData> data) {
         double localUtil = data.stream().mapToInt(d -> d.localUtilization).average().getAsDouble();
         double senderUtil = data.stream().mapToInt(d -> d.senderUtilization).average().getAsDouble();
         double receiverUtil = data.stream().mapToInt(d -> d.receiverUtilization).average().getAsDouble();
@@ -68,7 +72,7 @@ public class Diagnostics implements Serializable {
     public String toString() {
         StringBuilder builder = new StringBuilder();
         for (EdgeD edgeD : edges.values()) {
-            builder.append(edgeD.toString()).append("\n");
+            builder.append(edgeD).append('\n');
         }
         return builder.toString();
     }
@@ -131,6 +135,14 @@ public class Diagnostics implements Serializable {
                 sum += conveyor.get(conveyor.length() - 1);
             }
             return sum / localConveyors.length;
+        }
+
+        void clear() {
+            for (AtomicIntegerArray conveyor : localConveyors) {
+                for (int j = 0; j < conveyor.length() - (isDistributed() ? 1 : 0); j++) {
+                    conveyor.lazySet(j, 0);
+                }
+            }
         }
 
         public String name() {
