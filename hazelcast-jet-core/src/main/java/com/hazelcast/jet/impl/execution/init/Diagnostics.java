@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicIntegerArray;
 
 public class Diagnostics {
 
-    Map<String, EdgeD> edges = new HashMap<>();
+    public Map<String, EdgeD> edges = new HashMap<>();
 
     public static class EdgeD {
 
@@ -82,6 +82,10 @@ public class Diagnostics {
                 sum += conveyor.get(conveyor.length() - 1);
             }
             return sum / localConveyors.length;
+        }
+
+        public String name() {
+            return source + "->" + destination;
         }
 
         private boolean isDistributed() {

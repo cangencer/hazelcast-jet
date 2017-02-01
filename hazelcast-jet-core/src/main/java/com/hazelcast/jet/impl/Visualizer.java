@@ -14,8 +14,13 @@ package com.hazelcast.jet.impl;/*
  * limitations under the License.
  */
 
+import com.hazelcast.jet.impl.execution.init.Diagnostics;
+import com.hazelcast.jet.impl.execution.init.Diagnostics.EdgeD;
+
 import javax.swing.*;
 import java.awt.*;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Visualizer extends JFrame {
 
@@ -24,48 +29,75 @@ public class Visualizer extends JFrame {
     public static final int THICKNESS_NARROW = 1;
     public static final int THICKNESS_MIDDLE = 1;
     public static final int THICKNESS_THICK = 1;
-
-    /**
-     * @param edgeName "&lt;source_vertex_name>-&lt;target_vertex_name>"
-     * @param color
-     * @param thickness {@code THICKNESS_*} constants
-     */
-    public void setEdgeProperties(String edgeName, Color color, int thickness) {
-        // TODO
-    }
+    private final Diagnostics diagnostics;
 
     private final class MyPanel extends JPanel {
+
+        private final Map<String, Edge> edges = new HashMap<>();
+
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
+            int[] y = {0};
+            edges.forEach((name, edge) -> {
+                g.drawRect(20, 400 - y[0], edge.thickness, 100);
+                y[0] += 20;
+            });
+        }
 
-            ((Graphics2D) g).scale(scale, scale);
+        private void update() {
+            for (EdgeD edgeD : diagnostics.edges.values()) {
+                int prctFull = edgeD.localInFlightItems();
+                Color color = prctFull == 100 ? Color.RED : Color.BLUE;
+                setEdgeProperties(edgeD.name(), color, 2);
+            }
+        }
 
-            g.drawRect(50, 50, 1950, 1950);
+        private void setEdgeProperties(String edgeName, Color color, int thickness) {
+            System.out.println("edge " + edgeName);
+            edges.computeIfAbsent(edgeName, x -> new Edge())
+                 .update(color, thickness);
+        }
+
+    }
+
+
+    public Visualizer(Diagnostics diagnostics) throws HeadlessException {
+        this.diagnostics = diagnostics;
+    }
+
+    public void startVisualizing() {
+        SwingUtilities.invokeLater(() -> {
+            setTitle("Jet Visualizer");
+            setLayout(new BorderLayout());
+            setSize((int) (1024*scale), (int) (768*scale));
+            setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+
+            MyPanel container = new MyPanel();
+            container.setSize((int) (2000*scale), (int) (2000*scale));
+            container.setMaximumSize(new Dimension((int) (2000*scale), (int) (2000*scale)));
+            JScrollPane scrPane = new JScrollPane(container);
+            this.add(scrPane);
+            scrPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
+
+            setVisible(true);
+
+            System.out.println(scrPane.getSize());
+
+            new Timer(100, e -> {
+                container.update();
+            }).start();
+        });
+    }
+
+
+    private static class Edge {
+        Color color;
+        int thickness;
+
+        void update(Color color, int thickness) {
+            this.color = color;
+            this.thickness = thickness;
         }
     }
-
-    public Visualizer() {
-        setTitle("Jet Visualizer");
-        setLayout(new BorderLayout());
-        setSize((int) (1024*scale), (int) (768*scale));
-        setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-
-        MyPanel container = new MyPanel();
-        container.setSize((int) (2000*scale), (int) (2000*scale));
-        container.setMaximumSize(new Dimension((int) (2000*scale), (int) (2000*scale)));
-        JScrollPane scrPane = new JScrollPane(container);
-        this.add(scrPane);
-        scrPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
-
-        setVisible(true);
-
-        System.out.println(scrPane.getSize());
-    }
-
-    public static void main(String[] args) throws ClassNotFoundException, UnsupportedLookAndFeelException, InstantiationException, IllegalAccessException {
-        UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        new Visualizer();
-    }
-
 }

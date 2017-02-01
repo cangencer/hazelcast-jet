@@ -17,12 +17,14 @@
 package com.hazelcast.jet.impl.execution;
 
 import com.hazelcast.jet.ProcessorSupplier;
+import com.hazelcast.jet.impl.Visualizer;
 import com.hazelcast.jet.impl.execution.init.Diagnostics;
 import com.hazelcast.jet.impl.execution.init.ExecutionPlan;
 import com.hazelcast.nio.Address;
 import com.hazelcast.nio.BufferObjectDataInput;
 import com.hazelcast.spi.NodeEngine;
 
+import javax.swing.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -103,6 +105,10 @@ public class ExecutionContext {
         senderMap = unmodifiableMap(plan.getSenderMap());
         tasklets = plan.getTasklets();
         diagnostics = plan.getDiagnostics();
+
+        if (nodeEngine.getThisAddress().equals(coordinatorAddr)) {
+            new Visualizer(diagnostics).startVisualizing();
+        }
         return this;
     }
 
