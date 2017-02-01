@@ -46,6 +46,7 @@ import com.hazelcast.jet.impl.execution.Tasklet;
 import com.hazelcast.jet.impl.execution.init.Contexts.MetaSupplierCtx;
 import com.hazelcast.jet.impl.execution.init.Contexts.ProcCtx;
 import com.hazelcast.jet.impl.execution.init.Contexts.ProcSupplierCtx;
+import com.hazelcast.jet.impl.execution.init.Diagnostics.EdgeD;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.logging.Logger;
 import com.hazelcast.nio.Address;
@@ -65,6 +66,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.function.Function;
 
 import static com.hazelcast.internal.util.concurrent.ConcurrentConveyor.concurrentConveyor;
@@ -88,6 +90,7 @@ public class ExecutionPlan implements IdentifiedDataSerializable {
 
     private List<VertexDef> vertices = new ArrayList<>();
     private final Map<String, ConcurrentConveyor<Object>[]> localConveyorMap = new HashMap<>();
+    private final Diagnostics diagnostics = new Diagnostics();
     private final Map<String, Map<Address, ConcurrentConveyor<Object>>> edgeSenderConveyorMap = new HashMap<>();
     private PartitionArrangement ptionArrgmt;
 
@@ -165,6 +168,10 @@ public class ExecutionPlan implements IdentifiedDataSerializable {
 
     public List<ProcessorSupplier> getProcessorSuppliers() {
         return vertices.stream().map(VertexDef::processorSupplier).collect(toList());
+    }
+
+    public Diagnostics getDiagnostics() {
+        return diagnostics;
     }
 
     public Map<Integer, Map<Integer, ReceiverTasklet>> getReceiverMap() {
@@ -261,6 +268,17 @@ public class ExecutionPlan implements IdentifiedDataSerializable {
             // each edge has an array of conveyors
             // one conveyor per consumer - each conveyor has one queue per producer
             // giving the total number of queues = producers * consumers
+
+            EdgeD edgeD = diagnostics.edges.computeIfAbsent(edge.edgeId(), id -> {
+                EdgeD e = new EdgeD(id, srcVertex.name(), edge.destVertex().name());
+                e.localConveyors = new AtomicIntegerArray[edge.destVertex().parallelism()];
+                int numQueues = srcVertex.parallelism() + (edge.isDistributed() ? 1 : 0);
+                for (int i = 0; i < e.localConveyors.length; i++) {
+                    e.localConveyors[i] = new AtomicIntegerArray(numQueues);
+                }
+                return e;
+            });
+
             localConveyorMap.computeIfAbsent(edge.edgeId(),
                     e -> createConveyorArray(edge.destVertex().parallelism(),
                             srcVertex.parallelism() + (edge.isDistributed() ? 1 : 0),
@@ -281,13 +299,19 @@ public class ExecutionPlan implements IdentifiedDataSerializable {
             Map<String, Map<Address, ConcurrentConveyor<Object>>> edgeSenderConveyorMap, EdgeDef edge
     ) {
         assert edge.isDistributed() : "Edge is not distributed";
+
         return edgeSenderConveyorMap.computeIfAbsent(edge.edgeId(), x -> {
             final Map<Address, ConcurrentConveyor<Object>> addrToConveyor = new HashMap<>();
-            for (Address destAddr : getRemoteMembers(nodeEngine)) {
+            List<Address> remoteMembers = getRemoteMembers(nodeEngine);
+            EdgeD edgeD = diagnostics.edges.get(edge.edgeId());
+            edgeD.senderConveyors = new AtomicIntegerArray[remoteMembers.size()];
+            for (int i = 0; i < remoteMembers.size(); i++) {
+                edgeD.senderConveyors[i] = new AtomicIntegerArray(edge.sourceVertex().parallelism());
+                Address destAddr = remoteMembers.get(i);
                 final ConcurrentConveyor<Object> conveyor =
                         createConveyorArray(1, edge.sourceVertex().parallelism(), edge.getConfig().getQueueSize())[0];
                 final ConcurrentInboundEdgeStream inboundEdgeStream = createInboundEdgeStream(
-                        edge.destOrdinal(), edge.priority(), conveyor);
+                        edge.destOrdinal(), edge.priority(), conveyor, edgeD.senderConveyors[i]);
                 final int destVertexId = edge.destVertex().vertexId();
                 final SenderTasklet t = new SenderTasklet(inboundEdgeStream, nodeEngine,
                         destAddr, executionId, destVertexId, edge.getConfig().getPacketSizeLimit());
@@ -368,16 +392,19 @@ public class ExecutionPlan implements IdentifiedDataSerializable {
             // each tasklet will have one input conveyor per edge
             // and one InboundEmitter per queue on the conveyor
             final ConcurrentConveyor<Object> conveyor = localConveyorMap.get(inEdge.edgeId())[processorIdx];
-            inboundStreams.add(createInboundEdgeStream(inEdge.destOrdinal(), inEdge.priority(), conveyor));
+            AtomicIntegerArray array = diagnostics.edges.get(inEdge.edgeId()).localConveyors[processorIdx];
+            inboundStreams.add(createInboundEdgeStream(inEdge.destOrdinal(), inEdge.priority(), conveyor, array));
         }
         return inboundStreams;
     }
 
-    private static ConcurrentInboundEdgeStream createInboundEdgeStream(
-            int ordinal, int priority, ConcurrentConveyor<Object> conveyor
-    ) {
+    private static ConcurrentInboundEdgeStream createInboundEdgeStream(int ordinal,
+                                                                       int priority,
+                                                                       ConcurrentConveyor<Object> conveyor,
+                                                                       AtomicIntegerArray array) {
         final InboundEmitter[] emitters = new InboundEmitter[conveyor.queueCount()];
-        Arrays.setAll(emitters, n -> new ConveyorEmitter(conveyor, n));
+        Arrays.setAll(emitters, queueIndex -> new ConveyorEmitter(conveyor, queueIndex,
+                c -> array.lazySet(queueIndex, c)));
         return new ConcurrentInboundEdgeStream(emitters, ordinal, priority);
     }
 }

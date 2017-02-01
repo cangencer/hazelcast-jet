@@ -17,6 +17,7 @@
 package com.hazelcast.jet.impl.execution;
 
 import com.hazelcast.jet.ProcessorSupplier;
+import com.hazelcast.jet.impl.execution.init.Diagnostics;
 import com.hazelcast.jet.impl.execution.init.ExecutionPlan;
 import com.hazelcast.nio.Address;
 import com.hazelcast.nio.BufferObjectDataInput;
@@ -51,6 +52,7 @@ public class ExecutionContext {
     private final NodeEngine nodeEngine;
     private final Address coordinatorAddr;
     private final ExecutionService execService;
+    private Diagnostics diagnostics;
 
     public ExecutionContext(long executionId, Address coordinatorAddr, NodeEngine nodeEngine, ExecutionService execService) {
         this.executionId = executionId;
@@ -100,6 +102,7 @@ public class ExecutionContext {
         receiverMap = unmodifiableMap(plan.getReceiverMap());
         senderMap = unmodifiableMap(plan.getSenderMap());
         tasklets = plan.getTasklets();
+        diagnostics = plan.getDiagnostics();
         return this;
     }
 
@@ -112,4 +115,7 @@ public class ExecutionContext {
         this.memberToId = unmodifiableMap(memberToId);
     }
 
+    public Diagnostics diagnostics() {
+        return diagnostics;
+    }
 }

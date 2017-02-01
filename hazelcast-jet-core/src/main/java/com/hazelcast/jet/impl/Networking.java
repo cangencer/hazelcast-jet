@@ -117,6 +117,9 @@ public class Networking {
         final boolean[] hasData = {false};
         out.writeInt(executionContexts.size());
         executionContexts.forEach((execId, exeCtx) -> uncheckRun(() -> {
+
+            System.out.println(exeCtx.diagnostics());
+
             final Integer memberId = exeCtx.getMemberId(member);
             if (memberId == null) {
                 // The target member is not involved in the job associated with this execution context

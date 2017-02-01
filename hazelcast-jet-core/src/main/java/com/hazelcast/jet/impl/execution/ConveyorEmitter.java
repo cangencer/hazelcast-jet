@@ -20,16 +20,19 @@ import com.hazelcast.internal.util.concurrent.ConcurrentConveyor;
 import com.hazelcast.jet.impl.util.ProgressState;
 
 import java.util.Collection;
+import java.util.function.IntConsumer;
 
 public class ConveyorEmitter implements InboundEmitter {
 
     private final CollectionWithDoneDetector doneDetector = new CollectionWithDoneDetector();
     private final ConcurrentConveyor<Object> conveyor;
     private final int queueIndex;
+    private final IntConsumer drained;
 
-    public ConveyorEmitter(ConcurrentConveyor<Object> conveyor, int queueIndex) {
+    public ConveyorEmitter(ConcurrentConveyor<Object> conveyor, int queueIndex, IntConsumer drained) {
         this.conveyor = conveyor;
         this.queueIndex = queueIndex;
+        this.drained = drained;
     }
 
     @Override
@@ -37,6 +40,7 @@ public class ConveyorEmitter implements InboundEmitter {
         doneDetector.wrapped = dest;
         try {
             int drainedCount = conveyor.drainTo(queueIndex, doneDetector);
+            drained.accept(drainedCount);
             return ProgressState.valueOf(drainedCount > 0, doneDetector.done);
         } finally {
             doneDetector.wrapped = null;
