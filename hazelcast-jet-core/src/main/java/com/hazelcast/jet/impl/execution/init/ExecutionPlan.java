@@ -269,8 +269,8 @@ public class ExecutionPlan implements IdentifiedDataSerializable {
             // one conveyor per consumer - each conveyor has one queue per producer
             // giving the total number of queues = producers * consumers
 
-            EdgeD edgeD = diagnostics.edges.computeIfAbsent(edge.edgeId(), id -> {
-                EdgeD e = new EdgeD(id, srcVertex.name(), edge.destVertex().name());
+            diagnostics.edges.computeIfAbsent(getEdgeName(edge), id -> {
+                EdgeD e = new EdgeD(id);
                 e.localConveyors = new AtomicIntegerArray[edge.destVertex().parallelism()];
                 int numQueues = srcVertex.parallelism() + (edge.isDistributed() ? 1 : 0);
                 for (int i = 0; i < e.localConveyors.length; i++) {
@@ -303,7 +303,7 @@ public class ExecutionPlan implements IdentifiedDataSerializable {
         return edgeSenderConveyorMap.computeIfAbsent(edge.edgeId(), x -> {
             final Map<Address, ConcurrentConveyor<Object>> addrToConveyor = new HashMap<>();
             List<Address> remoteMembers = getRemoteMembers(nodeEngine);
-            EdgeD edgeD = diagnostics.edges.get(edge.edgeId());
+            EdgeD edgeD = diagnostics.edges.get(getEdgeName(edge));
             edgeD.senderConveyors = new AtomicIntegerArray[remoteMembers.size()];
             for (int i = 0; i < remoteMembers.size(); i++) {
                 edgeD.senderConveyors[i] = new AtomicIntegerArray(edge.sourceVertex().parallelism());
@@ -323,6 +323,10 @@ public class ExecutionPlan implements IdentifiedDataSerializable {
             }
             return addrToConveyor;
         });
+    }
+
+    private String getEdgeName(EdgeDef edge) {
+        return edge.sourceVertex().name() + "->" + edge.destVertex().name();
     }
 
     @SuppressWarnings("unchecked")
@@ -392,7 +396,8 @@ public class ExecutionPlan implements IdentifiedDataSerializable {
             // each tasklet will have one input conveyor per edge
             // and one InboundEmitter per queue on the conveyor
             final ConcurrentConveyor<Object> conveyor = localConveyorMap.get(inEdge.edgeId())[processorIdx];
-            AtomicIntegerArray array = diagnostics.edges.get(inEdge.edgeId()).localConveyors[processorIdx];
+            AtomicIntegerArray array = diagnostics.edges.get(getEdgeName(inEdge))
+                    .localConveyors[processorIdx];
             inboundStreams.add(createInboundEdgeStream(inEdge.destOrdinal(), inEdge.priority(), conveyor, array));
         }
         return inboundStreams;

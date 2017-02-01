@@ -16,19 +16,70 @@
 
 package com.hazelcast.jet.impl.execution.init;
 
+import com.hazelcast.nio.Address;
+
+import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicIntegerArray;
 
-public class Diagnostics {
+public class Diagnostics implements Serializable {
 
     public Map<String, EdgeD> edges = new HashMap<>();
 
+    public Map<Address, Map<String, DiagData>> remoteData = new ConcurrentHashMap<>();
+
+    public Map<String, DiagData> localData() {
+        Map<String, DiagData> map = new HashMap<>();
+        for (Entry<String, EdgeD> entry : edges.entrySet()) {
+            map.put(entry.getKey(), entry.getValue().data());
+        }
+        return map;
+    }
+
+    public Map<String, DiagData> aggrData() {
+        Map<String, DiagData> aggrData = new HashMap<>();
+        Map<String, DiagData> localData = localData();
+
+        for (Entry<String, DiagData> e : localData.entrySet()) {
+            List<DiagData> list = new ArrayList<>();
+            list.add(e.getValue());
+            String edge = e.getKey();
+            for (Map<String, DiagData> re : remoteData.values()) {
+                list.add(re.get(edge));
+            }
+            aggrData.put(edge, aggregate(list));
+        }
+        return aggrData;
+    }
+
+    private DiagData aggregate(List<DiagData> data) {
+        double localUtil = data.stream().mapToInt(d -> d.localUtilization).average().getAsDouble();
+        double senderUtil = data.stream().mapToInt(d -> d.senderUtilization).average().getAsDouble();
+        double receiverUtil = data.stream().mapToInt(d -> d.receiverUtilization).average().getAsDouble();
+        return new DiagData((int) localUtil, (int) senderUtil, (int) receiverUtil);
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder builder = new StringBuilder();
+        for (EdgeD edgeD : edges.values()) {
+            builder.append(edgeD.toString()).append("\n");
+        }
+        return builder.toString();
+    }
+
+    public void updateRemoteData(Address fromAddr, Map<String, DiagData> data) {
+        remoteData.put(fromAddr, data);
+    }
+
     public static class EdgeD {
 
-        final String id;
-        final String source;
-        final String destination;
+        final String name;
 //
 //        int localInFlightItems; // sum of all local conveyors queues except the receiver queue
 //        int itemsToSenders; // sum of conveyors between processors and sender tasklets
@@ -39,13 +90,11 @@ public class Diagnostics {
         AtomicIntegerArray[] localConveyors; // last index in each atomic array is the receiver queue size
         AtomicIntegerArray[] senderConveyors;
 
-        EdgeD(String id, String source, String destination) {
-            this.id = id;
-            this.source = source;
-            this.destination = destination;
+        EdgeD(String name) {
+            this.name = name;
         }
 
-        public int localInFlightItems() {
+        public int localUtilization() {
             int sum = 0;
             int count = 0;
             for (AtomicIntegerArray conveyor : localConveyors) {
@@ -57,7 +106,7 @@ public class Diagnostics {
             return sum / count;
         }
 
-        public int itemsToSenders() {
+        public int senderUtilization() {
             if (!isDistributed()) {
                 return -1;
             }
@@ -73,7 +122,7 @@ public class Diagnostics {
             return sum / count;
         }
 
-        public int itemsFromReceiver() {
+        public int receiverUtilization() {
             if (!isDistributed()) {
                 return -1;
             }
@@ -85,28 +134,48 @@ public class Diagnostics {
         }
 
         public String name() {
-            return source + "->" + destination;
+            return name;
+        }
+
+        public DiagData data() {
+            return new DiagData(localUtilization(), senderUtilization(), receiverUtilization());
         }
 
         private boolean isDistributed() {
             return senderConveyors != null;
         }
 
-        @Override public String toString() {
+        @Override
+        public String toString() {
             if (isDistributed()) {
-                return source + "->" + destination + "\t\t l:" + localInFlightItems() + " s:" + itemsToSenders() + " r:" +
-                        itemsFromReceiver();
+                return name() + "\t\t l:" + localUtilization() + " s:" + senderUtilization() + " r:" +
+                        receiverUtilization();
             }
-            return source + "->" + destination + "\t\t l:" + localInFlightItems();
+            return name() + "\t\t l:" + localUtilization();
         }
     }
 
-    @Override
-    public String toString() {
-        StringBuilder builder = new StringBuilder();
-        for (EdgeD edgeD : edges.values()) {
-            builder.append(edgeD.toString()).append("\n");
+    public static class DiagData implements Serializable {
+
+        public int localUtilization;
+        public int senderUtilization;
+        public int receiverUtilization;
+
+        DiagData(int localUtilization, int senderUtilization, int receiverUtilization) {
+            this.localUtilization = localUtilization;
+            this.senderUtilization = senderUtilization;
+            this.receiverUtilization = receiverUtilization;
         }
-        return builder.toString();
+
+        @Override
+        public String toString() {
+            if (senderUtilization == -1) {
+                return "local=" + localUtilization;
+            }
+
+            return "local=" + localUtilization +
+                    ", sender=" + senderUtilization +
+                    ", receiver=" + receiverUtilization;
+        }
     }
 }

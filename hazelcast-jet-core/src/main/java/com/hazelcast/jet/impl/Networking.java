@@ -18,6 +18,7 @@ package com.hazelcast.jet.impl;
 
 import com.hazelcast.jet.impl.execution.ExecutionContext;
 import com.hazelcast.jet.impl.execution.SenderTasklet;
+import com.hazelcast.jet.impl.execution.init.Diagnostics.DiagData;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.nio.Address;
 import com.hazelcast.nio.BufferObjectDataInput;
@@ -34,11 +35,11 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 
+import static com.hazelcast.jet.impl.util.ExceptionUtil.sneakyThrow;
 import static com.hazelcast.jet.impl.util.Util.createObjectDataInput;
 import static com.hazelcast.jet.impl.util.Util.createObjectDataOutput;
 import static com.hazelcast.jet.impl.util.Util.getMemberConnection;
 import static com.hazelcast.jet.impl.util.Util.getRemoteMembers;
-import static com.hazelcast.jet.impl.util.ExceptionUtil.sneakyThrow;
 import static com.hazelcast.jet.impl.util.Util.uncheckRun;
 import static com.hazelcast.nio.Packet.FLAG_JET_FLOW_CONTROL;
 import static com.hazelcast.nio.Packet.FLAG_URGENT;
@@ -117,9 +118,6 @@ public class Networking {
         final boolean[] hasData = {false};
         out.writeInt(executionContexts.size());
         executionContexts.forEach((execId, exeCtx) -> uncheckRun(() -> {
-
-            System.out.println(exeCtx.diagnostics());
-
             final Integer memberId = exeCtx.getMemberId(member);
             if (memberId == null) {
                 // The target member is not involved in the job associated with this execution context
@@ -135,6 +133,8 @@ public class Networking {
                                 hasData[0] = true;
                             }
                     )));
+
+            out.writeObject(exeCtx.diagnostics().localData());
         }));
         return hasData[0] ? out.toByteArray() : EMPTY_BYTES;
     }
@@ -145,9 +145,10 @@ public class Networking {
         final int executionCtxCount = in.readInt();
         for (int j = 0; j < executionCtxCount; j++) {
             final long exeCtxId = in.readLong();
+            Optional<ExecutionContext> executionContext = Optional.ofNullable(executionContexts)
+                                                                  .map(exeCtxs -> exeCtxs.get(exeCtxId));
             final Map<Integer, Map<Integer, Map<Address, SenderTasklet>>> senderMap =
-                    Optional.ofNullable(executionContexts)
-                            .map(exeCtxs -> exeCtxs.get(exeCtxId))
+                    executionContext
                             .map(ExecutionContext::senderMap)
                             .orElse(null);
             if (senderMap == null) {
@@ -169,6 +170,11 @@ public class Networking {
                 }
                 t.setSendSeqLimitCompressed(sendSeqLimitCompressed);
             }
+
+            Map<String, DiagData> data = in.readObject();
+            executionContext.ifPresent(e -> {
+                e.diagnostics().updateRemoteData(fromAddr, data);
+            });
         }
     }
 
