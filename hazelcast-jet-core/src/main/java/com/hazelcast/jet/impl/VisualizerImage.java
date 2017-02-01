@@ -1,4 +1,20 @@
-package com.hazelcast.jet.impl.util;
+/*
+ * Copyright (c) 2008-2017, Hazelcast, Inc. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.hazelcast.jet.impl;
 
 import java.awt.*;
 import java.awt.geom.AffineTransform;
@@ -61,14 +77,10 @@ public VisualizerImage(int width, int height) {
         oldStroke = g.getStroke();
         oldColor = g.getColor();
 
-        if ( ! properties.containsKey(key)) {
-            System.err.println("properties for " + key + " not found");
-            properties.put(key, null);
-        }
         LineProperties props = properties.get(key);
-        if (props == null)
+        if (props == null) {
             return;
-
+        }
         g.setStroke(new BasicStroke(STROKE_WIDTHS[props.thickness]));
         g.setColor(props.color);
     }
@@ -97,31 +109,30 @@ public VisualizerImage(int width, int height) {
         if (image == null) {
             image = new BufferedImage(getIconWidth(), getIconHeight(), BufferedImage.TYPE_INT_ARGB);
             double coef = Math.min((double) width / (double) 680, (double) height / (double) 747);
-            
+
             Graphics2D g2d = image.createGraphics();
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2d.scale(coef, coef);
             paint(g2d);
             g2d.dispose();
         }
-        
         g.drawImage(image, x, y, null);
     }
 
     /**
      * Paints the transcoded SVG image on the specified graphics context.
-     * 
+     *
      * @param g Graphics context.
      */
-    private void paint(Graphics2D g) {
+     void paint(Graphics2D g) {
         Shape shape = null;
-        
-        float origAlpha = 1.0f;
-        
-        java.util.LinkedList<AffineTransform> transformations = new java.util.LinkedList<AffineTransform>();
-        
 
-        // 
+        float origAlpha = 1.0f;
+
+        java.util.LinkedList<AffineTransform> transformations = new java.util.LinkedList<AffineTransform>();
+
+
+        //
         transformations.push(g.getTransform());
         g.transform(new AffineTransform(3.7795277f, 0, 0, 3.7795277f, 0, 5.7671015E-5f));
 
@@ -140,7 +151,7 @@ public VisualizerImage(int width, int height) {
         g.draw(shape);
 
         // _0_0_0_1
-        //  doc-source 
+        //  doc-source
         shape = new GeneralPath();
 
         g.fill(shape);
@@ -374,7 +385,7 @@ public VisualizerImage(int width, int height) {
         g.draw(shape);
 
         // _0_0_1_1
-        //  stopword-source 
+        //  stopword-source
         shape = new GeneralPath();
 
         g.fill(shape);
@@ -727,7 +738,7 @@ public VisualizerImage(int width, int height) {
         g.draw(shape);
 
         // _0_0_2_1
-        //  doc-lines 
+        //  doc-lines
         shape = new GeneralPath();
 
         g.fill(shape);
@@ -920,7 +931,7 @@ public VisualizerImage(int width, int height) {
         g.draw(shape);
 
         // _0_0_3_1
-        //  tokenize 
+        //  tokenize
         shape = new GeneralPath();
 
         g.fill(shape);
@@ -1094,7 +1105,7 @@ public VisualizerImage(int width, int height) {
         g.draw(shape);
 
         // _0_0_4_1
-        //  doc-count 
+        //  doc-count
         shape = new GeneralPath();
 
         g.fill(shape);
@@ -1295,7 +1306,7 @@ public VisualizerImage(int width, int height) {
         g.draw(shape);
 
         // _0_0_5_1
-        //  tf-idf 
+        //  tf-idf
         shape = new GeneralPath();
 
         g.fill(shape);
@@ -1425,7 +1436,7 @@ public VisualizerImage(int width, int height) {
         g.draw(shape);
 
         // _0_0_6_1
-        //  sink  
+        //  sink
         shape = new GeneralPath();
 
         g.fill(shape);
@@ -1525,7 +1536,7 @@ public VisualizerImage(int width, int height) {
         ((GeneralPath) shape).lineTo(98.889725, 66.413216);
 
         g.setStroke(new BasicStroke(0.26458332f, 0, 0, 4));
-        setPropertiesToGraphics("doc-source -> doc-lines", g);
+        setPropertiesToGraphics("doc-source->doc-lines", g);
         g.draw(shape);
         resetPropertiesFromGraphics(g);
 
@@ -1535,7 +1546,7 @@ public VisualizerImage(int width, int height) {
         ((GeneralPath) shape).lineTo(35.079124, 52.98292);
         ((GeneralPath) shape).lineTo(35.814117, 102.16051);
 
-        setPropertiesToGraphics("doc-source -> doc-count", g);
+        setPropertiesToGraphics("doc-source->doc-count", g);
         g.draw(shape);
         resetPropertiesFromGraphics(g);
         transformations.push(g.getTransform());
@@ -1549,7 +1560,7 @@ public VisualizerImage(int width, int height) {
         g.fill(shape);
 
         // _0_0_9_1
-        //  (docId, docName) 
+        //  (docId, docName)
         g.setPaint(BLACK);
         shape = new GeneralPath();
 
@@ -1883,7 +1894,7 @@ public VisualizerImage(int width, int height) {
         g.draw(shape);
 
         // _0_0_10_1
-        //        tf 
+        //        tf
         shape = new GeneralPath();
 
         g.fill(shape);
@@ -1945,7 +1956,7 @@ public VisualizerImage(int width, int height) {
         ((GeneralPath) shape).lineTo(108.51143, 102.8955);
 
         g.setStroke(new BasicStroke(0.26458332f, 0, 0, 4));
-        setPropertiesToGraphics("doc-lines -> tokenize", g);
+        setPropertiesToGraphics("doc-lines->tokenize", g);
         g.draw(shape);
         resetPropertiesFromGraphics(g);
 
@@ -1954,7 +1965,7 @@ public VisualizerImage(int width, int height) {
         ((GeneralPath) shape).moveTo(109.04597, 112.78448);
         ((GeneralPath) shape).lineTo(108.979164, 135.97011);
 
-        setPropertiesToGraphics("tokenize -> tf", g);
+        setPropertiesToGraphics("tokenize->tf", g);
         g.draw(shape);
         resetPropertiesFromGraphics(g);
 
@@ -1964,7 +1975,7 @@ public VisualizerImage(int width, int height) {
         ((GeneralPath) shape).lineTo(166.8765, 93.7433);
         ((GeneralPath) shape).lineTo(126.527534, 107.96466);
 
-        setPropertiesToGraphics("stopword-source -> tf", g);
+        setPropertiesToGraphics("stopword-source->tokenize", g);
         g.draw(shape);
         resetPropertiesFromGraphics(g);
 
@@ -1974,7 +1985,7 @@ public VisualizerImage(int width, int height) {
         ((GeneralPath) shape).lineTo(27.194672, 176.12735);
         ((GeneralPath) shape).lineTo(52.184372, 176.19415);
 
-        setPropertiesToGraphics("doc-count -> tf-idf", g);
+        setPropertiesToGraphics("doc-count->tf-idf", g);
         g.draw(shape);
         resetPropertiesFromGraphics(g);
 
@@ -1984,7 +1995,7 @@ public VisualizerImage(int width, int height) {
         ((GeneralPath) shape).lineTo(108.31097, 174.99147);
         ((GeneralPath) shape).lineTo(88.39939, 175.99373);
 
-        setPropertiesToGraphics("tf -> tf-idf", g);
+        setPropertiesToGraphics("tf->tf-idf", g);
         g.draw(shape);
         resetPropertiesFromGraphics(g);
 
@@ -1993,7 +2004,7 @@ public VisualizerImage(int width, int height) {
         ((GeneralPath) shape).moveTo(69.32304, 181.57297);
         ((GeneralPath) shape).lineTo(69.55689, 208.73424);
 
-        setPropertiesToGraphics("tf-idf -> sink", g);
+        setPropertiesToGraphics("tf-idf->sink", g);
         g.draw(shape);
         resetPropertiesFromGraphics(g);
         transformations.push(g.getTransform());
@@ -2007,7 +2018,7 @@ public VisualizerImage(int width, int height) {
         g.fill(shape);
 
         // _0_0_17_1
-        //  (docId, docName) 
+        //  (docId, docName)
         g.setPaint(BLACK);
         shape = new GeneralPath();
 
@@ -2343,7 +2354,7 @@ public VisualizerImage(int width, int height) {
         g.fill(shape);
 
         // _0_0_18_0_1
-        //  (docId, line) 
+        //  (docId, line)
         g.setPaint(BLACK);
         shape = new GeneralPath();
 
@@ -2562,7 +2573,7 @@ public VisualizerImage(int width, int height) {
         // _0_0_18_1_1
 
         // _0_0_18_1_1_0
-        //  (docId, word) 
+        //  (docId, word)
         g.setPaint(BLACK);
         shape = new GeneralPath();
 
@@ -2803,7 +2814,7 @@ public VisualizerImage(int width, int height) {
         // _0_0_18_2_1
 
         // _0_0_18_2_1_0
-        //  (set-of-stopwords) 
+        //  (set-of-stopwords)
         g.setPaint(BLACK);
         shape = new GeneralPath();
 
@@ -3210,7 +3221,7 @@ public VisualizerImage(int width, int height) {
         // _0_0_18_3_1
 
         // _0_0_18_3_1_0
-        //  ((docId, word), count) 
+        //  ((docId, word), count)
         g.setPaint(BLACK);
         shape = new GeneralPath();
         paint1(g, origAlpha, transformations);
@@ -3598,7 +3609,7 @@ public VisualizerImage(int width, int height) {
         // _0_0_18_3_1_1_1
 
         // _0_0_18_3_1_1_1_0
-        //  (count) 
+        //  (count)
         g.setPaint(BLACK);
         shape = new GeneralPath();
 
@@ -3740,7 +3751,7 @@ public VisualizerImage(int width, int height) {
         g.fill(shape);
 
         // _0_0_18_3_1_1_1_1
-        //   
+        //
         shape = new GeneralPath();
 
         g.fill(shape);
@@ -3759,7 +3770,7 @@ public VisualizerImage(int width, int height) {
         // _0_0_18_3_1_1_2_1
 
         // _0_0_18_3_1_1_2_1_0
-        //  (word, list(docId), tfidf-score) 
+        //  (word, list(docId), tfidf-score)
         g.setPaint(BLACK);
         shape = new GeneralPath();
 

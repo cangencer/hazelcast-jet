@@ -2,7 +2,6 @@ package com.hazelcast.jet.impl;
 
 import com.hazelcast.jet.impl.execution.init.Diagnostics;
 import com.hazelcast.jet.impl.execution.init.Diagnostics.EdgeD;
-import com.hazelcast.jet.impl.util.VisualizerImage;
 
 import javax.swing.*;
 import java.awt.*;
@@ -12,7 +11,6 @@ import static javax.swing.WindowConstants.EXIT_ON_CLOSE;
 public class Visualizer {
 
     private MainPanel mainPanel;
-    private VisualizerImage image;
 
     public Visualizer(Diagnostics diagnostics) {
         try {
@@ -24,24 +22,24 @@ public class Visualizer {
         SwingUtilities.invokeLater(() -> {
             mainPanel = new MainPanel(diagnostics);
             buildFrame(mainPanel);
-            new Timer(100, e -> mainPanel.update()).start();
+            new Timer(50, e -> mainPanel.update()).start();
         });
     }
 
     private static void buildFrame(MainPanel mainPanel) {
+        mainPanel.setBackground(Color.WHITE);
         final JFrame frame = new JFrame();
-        frame.setBackground(Color.WHITE);
         frame.setDefaultCloseOperation(EXIT_ON_CLOSE);
         frame.setTitle("Jet Visualizer");
-        frame.setBounds(40, 40, 1000, 600);
+        frame.setBounds(40, 10, 750, 1000);
         frame.setLayout(new BorderLayout());
         frame.add(mainPanel);
         frame.setVisible(true);
     }
 
-    private class MainPanel extends JPanel {
+    private static class MainPanel extends JPanel {
         private final Diagnostics diagnostics;
-//        private final Map<String, Edge> edges = new HashMap<>();
+        private final VisualizerImage image = new VisualizerImage();
 
         MainPanel(Diagnostics diagnostics) {
             this.diagnostics = diagnostics;
@@ -49,43 +47,21 @@ public class Visualizer {
 
         @Override
         protected void paintComponent(Graphics g) {
-            /*super.paintComponent(g);
-            g.setColor(getBackground());
-            g.fillRect(0, 0, getWidth(), getHeight());
-            int[] y = {0};
-            edges.forEach((name, edge) -> {
-                g.setColor(edge.color);
-                g.fillRect(20, 400 - y[0], 100, edge.thickness);
-                y[0] += 20;
-            });*/
-            image.paintIcon(this, g, 0, 0);
+            image.paint((Graphics2D) g);
         }
 
         void update() {
             for (EdgeD edgeD : diagnostics.edges.values()) {
                 int prctFull = edgeD.localInFlightItems();
-                Color color = prctFull == 100 ? Color.RED : Color.BLUE;
-//                edges.computeIfAbsent(edgeD.name(), x -> new Edge())
-//                     .update(color, 2);
-                image.setPropertiesFor(edgeD.name(),  0, color);
+                Color color =
+                          prctFull > 90 ? Color.RED
+                        : prctFull > 50 ? Color.ORANGE
+                        : prctFull > 25 ? Color.PINK
+                        : prctFull > 5 ? Color.BLUE
+                        : Color.BLACK;
+                image.setPropertiesFor(edgeD.name(), 2, color);
             }
             repaint();
-        }
-
-    }
-
-    private static class Edge {
-        Color color = Color.BLACK;
-        int thickness = 2;
-
-        void update(Color color, int thickness) {
-            this.color = color;
-            this.thickness = thickness;
-        }
-
-        @Override
-        public String toString() {
-            return color + " " + thickness;
         }
     }
 }

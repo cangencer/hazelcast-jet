@@ -82,6 +82,7 @@ public class ExecutionContext {
     }
 
     public void complete(Throwable error) {
+        diagnostics.clear();
         procSuppliers.forEach(s -> s.complete(error));
     }
 
