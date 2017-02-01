@@ -108,7 +108,12 @@ public class ExecutionContext {
         diagnostics = plan.getDiagnostics();
 
         if (nodeEngine.getThisAddress().equals(coordinatorAddr)) {
-            new Visualizer(diagnostics);
+            SwingUtilities.invokeLater(() -> new Visualizer(plan.getVertices(), diagnostics));
+        }
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
         return this;
     }

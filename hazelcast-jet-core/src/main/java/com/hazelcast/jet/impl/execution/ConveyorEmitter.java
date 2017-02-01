@@ -44,10 +44,13 @@ public class ConveyorEmitter implements InboundEmitter {
             int drainedCount = conveyor.drainTo(queueIndex, doneDetector);
             int prctFull = 100 * drainedCount / capacity;
             drained.accept(prctFull);
-            return ProgressState.valueOf(drainedCount > 0, doneDetector.done);
+            ProgressState progressState = ProgressState.valueOf(drainedCount > 0, doneDetector.done);
+            if (progressState.isDone()) {
+                drained.accept(-1);
+            }
+            return progressState;
         } finally {
             doneDetector.wrapped = null;
         }
     }
-
 }

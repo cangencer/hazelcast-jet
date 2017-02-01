@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<license>
+  <licensefileversion>1.0</licensefileversion>
+  <product>yFiles for Java</product>
+  <package>complete</package>
+  <type>eval</type>
+  <distribution>false</distribution>
+  <watermark><![CDATA[yFiles for Java Evaluation License (expires in ${license-days-remaining} days)]]></watermark>
+  <version>3.0</version>
+  <date>02/01/2017</date>
+  <expires>04/03/2017</expires>
+  <key>37c6139cce385171d01d530b21ccacf37ecb21d7cc87b264d5ca42006bc450b9485d9845da2d8c04ae9b34ea0f83723fd6e6010b2f92a9ccc0059599ba4bcb6734939c8c7ed1a1a366c96ed9beb9c1ed14200e4b602fc858829285e1f09644c13d166f398d211dcad3c341cc522f30b3a1f36681e414993283e3c40eb8ccea3c</key>
+</license>
+

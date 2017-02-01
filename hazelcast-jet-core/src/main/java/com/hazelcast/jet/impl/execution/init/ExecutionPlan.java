@@ -88,7 +88,7 @@ public class ExecutionPlan implements IdentifiedDataSerializable {
     // dest vertex id --> dest ordinal --> dest addr --> sender tasklet
     private final Map<Integer, Map<Integer, Map<Address, SenderTasklet>>> senderMap = new HashMap<>();
 
-    private List<VertexDef> vertices = new ArrayList<>();
+    List<VertexDef> vertices = new ArrayList<>();
     private final Map<String, ConcurrentConveyor<Object>[]> localConveyorMap = new HashMap<>();
     private final Diagnostics diagnostics = new Diagnostics();
     private final Map<String, Map<Address, ConcurrentConveyor<Object>>> edgeSenderConveyorMap = new HashMap<>();
@@ -411,6 +411,10 @@ public class ExecutionPlan implements IdentifiedDataSerializable {
         Arrays.setAll(emitters, queueIndex -> new ConveyorEmitter(conveyor, queueIndex,
                 c -> array.lazySet(queueIndex, c)));
         return new ConcurrentInboundEdgeStream(emitters, ordinal, priority);
+    }
+
+    public List<VertexDef> getVertices() {
+        return vertices;
     }
 }
 

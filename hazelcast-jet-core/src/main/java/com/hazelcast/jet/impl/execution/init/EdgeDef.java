@@ -78,7 +78,7 @@ public class EdgeDef implements IdentifiedDataSerializable {
         return id;
     }
 
-    VertexDef sourceVertex() {
+    public VertexDef sourceVertex() {
         return sourceVertex;
     }
 
@@ -86,7 +86,7 @@ public class EdgeDef implements IdentifiedDataSerializable {
         return sourceOrdinal;
     }
 
-    VertexDef destVertex() {
+    public VertexDef destVertex() {
         return destVertex;
     }
 
