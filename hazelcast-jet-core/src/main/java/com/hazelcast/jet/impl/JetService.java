@@ -23,6 +23,7 @@ import com.hazelcast.core.MigrationListener;
 import com.hazelcast.instance.BuildInfoProvider;
 import com.hazelcast.instance.HazelcastInstanceImpl;
 import com.hazelcast.instance.JetBuildInfo;
+import com.hazelcast.internal.diagnostics.Diagnostics;
 import com.hazelcast.jet.DAG;
 import com.hazelcast.jet.JetInstance;
 import com.hazelcast.jet.TopologyChangedException;

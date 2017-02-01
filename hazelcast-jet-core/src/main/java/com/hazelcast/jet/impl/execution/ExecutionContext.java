@@ -107,7 +107,7 @@ public class ExecutionContext {
         diagnostics = plan.getDiagnostics();
 
         if (nodeEngine.getThisAddress().equals(coordinatorAddr)) {
-            new Visualizer(diagnostics).startVisualizing();
+            new Visualizer(diagnostics);
         }
         return this;
     }
