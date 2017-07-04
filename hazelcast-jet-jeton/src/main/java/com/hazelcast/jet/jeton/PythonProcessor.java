@@ -16,11 +16,13 @@
 
 package com.hazelcast.jet.jeton;
 
-import com.hazelcast.jet.AbstractProcessor;
+import com.hazelcast.jet.Inbox;
+import com.hazelcast.jet.Outbox;
+import com.hazelcast.jet.Processor;
 
 import javax.annotation.Nonnull;
 
-public class PythonProcessor extends AbstractProcessor {
+public class PythonProcessor implements Processor {
 
     private final Transform transform;
 
@@ -29,14 +31,13 @@ public class PythonProcessor extends AbstractProcessor {
     }
 
     @Override
-    protected void init(@Nonnull Context context) throws Exception {
-        // init processor
-        super.init(context);
+    public void init(@Nonnull Outbox outbox, @Nonnull Context context) {
+
     }
 
     @Override
-    protected boolean tryProcess(int ordinal, @Nonnull Object item) throws Exception {
-        return true;
+    public void process(int ordinal, @Nonnull Inbox inbox) {
+
     }
 
     @Override
