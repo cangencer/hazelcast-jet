@@ -33,7 +33,7 @@ public class PipeExecutor {
         DAG dag = new DAG();
         Vertex prev = null;
         for (Transform transform : transformList) {
-            if (transform.getName().equals("readMap")) {
+            if (transform.getName().equals("read_map")) {
                 String mapName = transform.getParam(0);
                 if (prev != null) {
                     throw new IllegalStateException("prev vertex is not null");
@@ -45,7 +45,7 @@ public class PipeExecutor {
                 dag.edge(Edge.between(prev, filter));
                 prev = filter;
             }
-            else if (transform.getName().equals("flatMap")) {
+            else if (transform.getName().equals("flat_map")) {
                 Vertex flatMap = dag.newVertex(uniqueVertexName("flatMap"), () -> new PythonProcessor(transform));
                 dag.edge(Edge.between(prev, flatMap));
                 prev = flatMap;
@@ -62,7 +62,7 @@ public class PipeExecutor {
                 dag.edge(Edge.between(accumulate, combine).distributed().partitioned(entryKey()));
                 prev = combine;
             }
-            else if (transform.getName().equals("writeMap")) {
+            else if (transform.getName().equals("write_map")) {
                 String mapName = transform.getParam(0);
                 if (prev == null) {
                     throw new IllegalStateException("prev vertex is null");

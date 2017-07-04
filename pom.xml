@@ -30,6 +30,7 @@
 
     <modules>
         <module>hazelcast-jet-all</module>
+        <module>hazelcast-jet-jeton</module>
         <module>hazelcast-jet-distribution</module>
         <module>hazelcast-jet-client-protocol</module>
         <module>hazelcast-jet-core</module>
