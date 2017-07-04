@@ -20,15 +20,15 @@ import com.hazelcast.internal.serialization.InternalSerializationService;
 import com.hazelcast.internal.serialization.impl.DefaultSerializationServiceBuilder;
 import com.hazelcast.nio.BufferObjectDataOutput;
 
-import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.ProcessBuilder.Redirect;
 
 public class PythonWorker {
 
     public static void main(String[] args) throws Exception {
         Process p = new ProcessBuilder().command("python", "-u", "/Users/can/src/jeton/jeton/worker.py")
-                                             .redirectError(new File("worker-output"))
+                                             .redirectError(Redirect.INHERIT)
                                              .start();
         InputStream in = p.getInputStream();
         OutputStream out = p.getOutputStream();
