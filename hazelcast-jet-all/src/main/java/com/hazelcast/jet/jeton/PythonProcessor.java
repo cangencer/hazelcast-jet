@@ -16,36 +16,31 @@
 
 package com.hazelcast.jet.jeton;
 
-import java.io.Serializable;
-import java.util.List;
+import com.hazelcast.jet.AbstractProcessor;
 
-public class Transform implements Serializable {
+import javax.annotation.Nonnull;
 
-    private final String name;
-    private final List params;
+public class PythonProcessor extends AbstractProcessor {
 
-    public Transform(String name, List params) {
-        this.name = name;
-        this.params = params;
-    }
+    private final Transform transform;
 
-    public String getName() {
-        return name;
-    }
-
-    public List getParams() {
-        return params;
-    }
-
-    public <E> E getParam(int index) {
-        return (E) params.get(index);
+    public PythonProcessor(Transform transform) {
+        this.transform = transform;
     }
 
     @Override
-    public String toString() {
-        return "Transform{" +
-                "name='" + name + '\'' +
-                ", params=" + params +
-                '}';
+    protected void init(@Nonnull Context context) throws Exception {
+        // init processor
+        super.init(context);
+    }
+
+    @Override
+    protected boolean tryProcess(int ordinal, @Nonnull Object item) throws Exception {
+        return super.tryProcess(ordinal, item);
+    }
+
+    @Override
+    public boolean complete() {
+        return true;
     }
 }

@@ -15,34 +15,37 @@
  */
 
 package com.hazelcast.jet.jeton;
+
+import com.hazelcast.jet.DAG;
 import com.hazelcast.jet.Jet;
 import com.hazelcast.jet.JetInstance;
 import py4j.GatewayServer;
 
 import java.util.List;
 
+import static com.hazelcast.jet.impl.util.Util.uncheckRun;
+
 public class JetonGateway {
 
     private final JetInstance jet;
 
     public JetonGateway() {
-            jet = Jet.newJetInstance();
-        }
-
-        public JetInstance getJetInstance() {
-            return jet;
-        }
-
-        public void execute(List<Transform> transforms) {
-            for (Transform transform : transforms) {
-                System.out.println(transform);
-            }
-        }
-
-        public static void main(String[] args) {
-            GatewayServer gatewayServer = new GatewayServer(new JetonGateway());
-            gatewayServer.start();
-            System.out.println("Gateway Server Started");
-        }
-
+        jet = Jet.newJetInstance();
     }
+
+    public JetInstance getJetInstance() {
+        return jet;
+    }
+
+    public void execute(List<Transform> transforms) {
+        DAG dag = PipeExecutor.buildDag(transforms);
+        uncheckRun(() -> jet.newJob(dag).execute().get());
+    }
+
+    public static void main(String[] args) {
+        GatewayServer gatewayServer = new GatewayServer(new JetonGateway());
+        gatewayServer.start();
+        System.out.println("Gateway Server Started");
+    }
+
+}

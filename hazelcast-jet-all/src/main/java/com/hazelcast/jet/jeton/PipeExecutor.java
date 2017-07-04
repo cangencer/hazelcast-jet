@@ -24,6 +24,9 @@ import com.hazelcast.jet.processor.Sources;
 
 import java.util.List;
 
+import static com.hazelcast.jet.function.DistributedFunctions.entryKey;
+import static com.hazelcast.jet.stream.impl.StreamUtil.uniqueVertexName;
+
 public class PipeExecutor {
 
     public static DAG buildDag(List<Transform> transformList) {
@@ -38,7 +41,26 @@ public class PipeExecutor {
                 prev = dag.newVertex("read-" + mapName, Sources.readMap(mapName));
             }
             else if (transform.getName().equals("filter")) {
-                prev = dag.newVertex()
+                Vertex filter = dag.newVertex(uniqueVertexName("filter"), () -> new PythonProcessor(transform));
+                dag.edge(Edge.between(prev, filter));
+                prev = filter;
+            }
+            else if (transform.getName().equals("flatMap")) {
+                Vertex flatMap = dag.newVertex(uniqueVertexName("flatMap"), () -> new PythonProcessor(transform));
+                dag.edge(Edge.between(prev, flatMap));
+                prev = flatMap;
+            }
+            else if (transform.getName().equals("map")) {
+                Vertex map = dag.newVertex(uniqueVertexName("map"), () -> new PythonProcessor(transform));
+                dag.edge(Edge.between(prev, map));
+                prev = map;
+            }
+            else if (transform.getName().equals("reduce")) {
+                Vertex accumulate = dag.newVertex(uniqueVertexName("accumulate"), () -> new PythonProcessor(transform));
+                Vertex combine = dag.newVertex(uniqueVertexName("combine"), () -> new PythonProcessor(transform));
+                dag.edge(Edge.between(prev, accumulate).partitioned(entryKey()));
+                dag.edge(Edge.between(accumulate, combine).distributed().partitioned(entryKey()));
+                prev = combine;
             }
             else if (transform.getName().equals("writeMap")) {
                 String mapName = transform.getParam(0);
