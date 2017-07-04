@@ -24,6 +24,7 @@ import com.hazelcast.jet.processor.Sources;
 
 import java.util.List;
 
+import static com.hazelcast.jet.Edge.between;
 import static com.hazelcast.jet.function.DistributedFunctions.entryKey;
 import static com.hazelcast.jet.stream.impl.StreamUtil.uniqueVertexName;
 
@@ -33,42 +34,46 @@ public class PipeExecutor {
         DAG dag = new DAG();
         Vertex prev = null;
         for (Transform transform : transformList) {
-            if (transform.getName().equals("read_map")) {
-                String mapName = transform.getParam(0);
-                if (prev != null) {
-                    throw new IllegalStateException("prev vertex is not null");
+            switch (transform.getName()) {
+                case "read_map": {
+                    String mapName = transform.getParam(0);
+                    if (prev != null) {
+                        throw new IllegalStateException("prev vertex is not null");
+                    }
+                    prev = dag.newVertex("read-" + mapName, Sources.readMap(mapName));
+                    break;
                 }
-                prev = dag.newVertex("read-" + mapName, Sources.readMap(mapName));
-            }
-            else if (transform.getName().equals("filter")) {
-                Vertex filter = dag.newVertex(uniqueVertexName("filter"), () -> new PythonProcessor(transform));
-                dag.edge(Edge.between(prev, filter));
-                prev = filter;
-            }
-            else if (transform.getName().equals("flat_map")) {
-                Vertex flatMap = dag.newVertex(uniqueVertexName("flatMap"), () -> new PythonProcessor(transform));
-                dag.edge(Edge.between(prev, flatMap));
-                prev = flatMap;
-            }
-            else if (transform.getName().equals("map")) {
-                Vertex map = dag.newVertex(uniqueVertexName("map"), () -> new PythonProcessor(transform));
-                dag.edge(Edge.between(prev, map));
-                prev = map;
-            }
-            else if (transform.getName().equals("reduce")) {
-                Vertex accumulate = dag.newVertex(uniqueVertexName("accumulate"), () -> new PythonProcessor(transform));
-                Vertex combine = dag.newVertex(uniqueVertexName("combine"), () -> new PythonProcessor(transform));
-                dag.edge(Edge.between(prev, accumulate).partitioned(entryKey()));
-                dag.edge(Edge.between(accumulate, combine).distributed().partitioned(entryKey()));
-                prev = combine;
-            }
-            else if (transform.getName().equals("write_map")) {
-                String mapName = transform.getParam(0);
-                if (prev == null) {
-                    throw new IllegalStateException("prev vertex is null");
+                case "filter":
+                    Vertex filter = dag.newVertex(uniqueVertexName("filter"), () -> new PythonProcessor(transform));
+                    dag.edge(between(prev, filter));
+                    prev = filter;
+                    break;
+                case "flat_map":
+                    Vertex flatMap = dag.newVertex(uniqueVertexName("flatMap"), () -> new PythonProcessor(transform));
+                    dag.edge(between(prev, flatMap));
+                    prev = flatMap;
+                    break;
+                case "map":
+                    Vertex map = dag.newVertex(uniqueVertexName("map"), () -> new PythonProcessor(transform));
+                    dag.edge(between(prev, map));
+                    prev = map;
+                    break;
+                case "reduce":
+                    Vertex accumulate = dag.newVertex(uniqueVertexName("accumulate"), () -> new PythonProcessor(transform));
+                    Vertex combine = dag.newVertex(uniqueVertexName("combine"), () -> new PythonProcessor(transform));
+                    dag.edge(between(prev, accumulate).partitioned(entryKey()));
+                    dag.edge(between(accumulate, combine).distributed().partitioned(entryKey()));
+                    prev = combine;
+                    break;
+                case "write_map": {
+                    String mapName = transform.getParam(0);
+                    if (prev == null) {
+                        throw new IllegalStateException("prev vertex is null");
+                    }
+                    Vertex sink = dag.newVertex("write-" + mapName, Sinks.writeMap(mapName));
+                    dag.edge(between(prev, sink));
+                    break;
                 }
-                Vertex sink = dag.newVertex("write-" + mapName, Sinks.writeMap(mapName));
-                dag.edge(Edge.between(prev, sink));
             }
         }
         return dag;
