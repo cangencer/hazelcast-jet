@@ -61,7 +61,7 @@ public class PythonProcessor implements Processor {
             in = new DataInputStream(pythonProcess.getInputStream());
             out = new DataOutputStream(pythonProcess.getOutputStream());
             BufferObjectDataOutput bout = ser.createObjectDataOutput();
-            bout.writeObject(transform);
+            transform.writeData(bout);
             byte[] packet = bout.toByteArray();
             out.writeInt(packet.length);
             out.write(packet);
@@ -101,8 +101,11 @@ public class PythonProcessor implements Processor {
     private void sendInboxToPython(List<Object> inboxItems) {
         BufferObjectDataOutput bout = ser.createObjectDataOutput();
         try {
+            bout.writeInt(0); // placeholder
             bout.writeObject(inboxItems);
+            bout.writeInt(0, bout.position() - 4);
             out.write(bout.toByteArray());
+            out.flush();
         } catch (IOException e) {
             throw new JetException("Failed to send input items to python", e);
         }

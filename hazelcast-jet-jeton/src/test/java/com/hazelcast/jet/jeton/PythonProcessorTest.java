@@ -19,6 +19,12 @@ package com.hazelcast.jet.jeton;
 import com.hazelcast.jet.test.TestSupport;
 import org.junit.Test;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
 import static com.hazelcast.jet.jeton.PythonProcessor.SYSPROP_PYTHON_PATH;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
@@ -30,8 +36,12 @@ public class PythonProcessorTest {
 
     @Test
     public void test() {
-        System.setProperty(SYSPROP_PYTHON_PATH, "/Users/mtopol/dev/java/jeton/jeton/worker.py");
-        TestSupport.testProcessor(() -> new PythonProcessor(new Transform("test", emptyList())),
-                asList("a", "b"), asList("a", "b"));
+        List<Object> list = new ArrayList<>();
+        list.add("a");
+        list.add("b");
+        list.addAll(IntStream.range(0, 2000).boxed().collect(Collectors.toList()));
+        System.setProperty(SYSPROP_PYTHON_PATH, "/Users/can/src/jeton/jeton/worker.py");
+        TestSupport.testProcessor(() -> new PythonProcessor(new Transform("test", new ArrayList<>())),
+                asList("a", "b"), list, false);
     }
 }

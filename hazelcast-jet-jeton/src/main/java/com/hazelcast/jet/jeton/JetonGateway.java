@@ -24,6 +24,7 @@ import py4j.GatewayServer;
 import java.util.List;
 
 import static com.hazelcast.jet.impl.util.Util.uncheckRun;
+import static com.hazelcast.jet.jeton.PythonProcessor.SYSPROP_PYTHON_PATH;
 
 public class JetonGateway {
 
@@ -43,6 +44,7 @@ public class JetonGateway {
     }
 
     public static void main(String[] args) {
+        System.setProperty(SYSPROP_PYTHON_PATH, "/Users/can/src/jeton/worker.py");
         GatewayServer gatewayServer = new GatewayServer(new JetonGateway());
         gatewayServer.start();
         System.out.println("Gateway Server Started");

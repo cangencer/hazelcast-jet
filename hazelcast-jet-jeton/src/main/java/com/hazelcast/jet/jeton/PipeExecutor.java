@@ -17,16 +17,21 @@
 package com.hazelcast.jet.jeton;
 
 import com.hazelcast.jet.DAG;
-import com.hazelcast.jet.Edge;
 import com.hazelcast.jet.Vertex;
+import com.hazelcast.jet.processor.Processors;
 import com.hazelcast.jet.processor.Sinks;
 import com.hazelcast.jet.processor.Sources;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import static com.hazelcast.jet.Edge.between;
+import static com.hazelcast.jet.Util.entry;
 import static com.hazelcast.jet.function.DistributedFunctions.entryKey;
 import static com.hazelcast.jet.stream.impl.StreamUtil.uniqueVertexName;
+import static java.util.Arrays.asList;
 
 public class PipeExecutor {
 
@@ -40,7 +45,11 @@ public class PipeExecutor {
                     if (prev != null) {
                         throw new IllegalStateException("prev vertex is not null");
                     }
-                    prev = dag.newVertex("read-" + mapName, Sources.readMap(mapName));
+                    Vertex source = dag.newVertex("read-" + mapName, Sources.readMap(mapName));
+                    Vertex toEntry = dag.newVertex("to-entry-" + mapName, Processors.map((Map.Entry e) -> entry(e.getKey
+                            (), e.getValue())));
+                    dag.edge(between(source, toEntry).isolated());
+                    prev = toEntry;
                     break;
                 }
                 case "filter":
@@ -54,13 +63,18 @@ public class PipeExecutor {
                     prev = flatMap;
                     break;
                 case "map":
-                    Vertex map = dag.newVertex(uniqueVertexName("map"), () -> new PythonProcessor(transform));
+                    Vertex map = dag.newVertex(uniqueVertexName("map"), () -> new PythonProcessor(transform))
+                                    .localParallelism(1);
                     dag.edge(between(prev, map));
                     prev = map;
                     break;
                 case "reduce":
-                    Vertex accumulate = dag.newVertex(uniqueVertexName("accumulate"), () -> new PythonProcessor(transform));
-                    Vertex combine = dag.newVertex(uniqueVertexName("combine"), () -> new PythonProcessor(transform));
+                    Transform accumulateT = new Transform("accumulate",
+                            new ArrayList(asList(transform.getParam(0), transform.getParam(1))));
+                    Transform combineT = new Transform("combine",
+                            new ArrayList(asList((Object)transform.getParam(2))));
+                    Vertex accumulate = dag.newVertex(uniqueVertexName("accumulate"), () -> new PythonProcessor(accumulateT));
+                    Vertex combine = dag.newVertex(uniqueVertexName("combine"), () -> new PythonProcessor(combineT));
                     dag.edge(between(prev, accumulate).partitioned(entryKey()));
                     dag.edge(between(accumulate, combine).distributed().partitioned(entryKey()));
                     prev = combine;
@@ -70,7 +84,7 @@ public class PipeExecutor {
                     if (prev == null) {
                         throw new IllegalStateException("prev vertex is null");
                     }
-                    Vertex sink = dag.newVertex("write-" + mapName, Sinks.writeMap(mapName));
+                    Vertex sink = dag.newVertex("write-" + mapName, Sinks.writeMap(mapName)).localParallelism(1);
                     dag.edge(between(prev, sink));
                     break;
                 }
