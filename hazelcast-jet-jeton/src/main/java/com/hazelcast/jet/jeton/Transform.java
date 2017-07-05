@@ -16,6 +16,11 @@
 
 package com.hazelcast.jet.jeton;
 
+import com.hazelcast.nio.ObjectDataInput;
+import com.hazelcast.nio.ObjectDataOutput;
+import com.hazelcast.nio.serialization.DataSerializable;
+
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.List;
 
@@ -43,9 +48,11 @@ public class Transform implements Serializable {
 
     @Override
     public String toString() {
-        return "Transform{" +
-                "name='" + name + '\'' +
-                ", params=" + params +
-                '}';
+        return "Transform{name='" + name + '\'' + ", params=" + params + '}';
+    }
+
+    public void writeData(ObjectDataOutput out) throws IOException {
+        out.writeUTF(name);
+        out.writeObject(params);
     }
 }

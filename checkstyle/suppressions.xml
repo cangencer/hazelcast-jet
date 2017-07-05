@@ -5,6 +5,8 @@
         "http://www.puppycrawl.com/dtds/suppressions_1_1.dtd">
 <suppressions>
 
+    <suppress checks="" files="com[\\/]hazelcast[\\/]jet[\\/]jeton"/>
+
     <!-- Files start with the license header -->
     <suppress checks="StrictDuplicateCode" files="\.java" lines="1-15"/>
 
