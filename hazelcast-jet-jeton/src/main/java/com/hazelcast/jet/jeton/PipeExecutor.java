@@ -23,7 +23,6 @@ import com.hazelcast.jet.processor.Sinks;
 import com.hazelcast.jet.processor.Sources;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -38,6 +37,7 @@ public class PipeExecutor {
     public static DAG buildDag(List<Transform> transformList) {
         DAG dag = new DAG();
         Vertex prev = null;
+        int parallelism = 1;
         for (Transform transform : transformList) {
             switch (transform.getName()) {
                 case "read_map": {
@@ -45,38 +45,52 @@ public class PipeExecutor {
                     if (prev != null) {
                         throw new IllegalStateException("prev vertex is not null");
                     }
-                    Vertex source = dag.newVertex("read-" + mapName, Sources.readMap(mapName));
+                    Vertex source = dag.newVertex("read-" + mapName, Sources.readMap(mapName)).localParallelism(1);
                     Vertex toEntry = dag.newVertex("to-entry-" + mapName, Processors.map((Map.Entry e) -> entry(e.getKey
-                            (), e.getValue())));
+                            (), e.getValue()))).localParallelism(parallelism);
                     dag.edge(between(source, toEntry).isolated());
                     prev = toEntry;
                     break;
                 }
+                case "read_list": {
+                    String listName = transform.getParam(0);
+                    if (prev != null) {
+                        throw new IllegalStateException("prev vertex is not null");
+                    }
+                    prev = dag.newVertex("read-" + listName, Sources.readList(listName)).localParallelism(1);
+                    break;
+                }
+                case "read_files":
+                    String path = transform.getParam(0);
+                    if (prev != null) {
+                        throw new IllegalStateException("prev vertex is not null");
+                    }
+                    prev = dag.newVertex("read-" + path, Sources.readFiles(path)).localParallelism(1);
+                    break;
                 case "filter":
                     Vertex filter = dag.newVertex(uniqueVertexName("filter"), () -> new PythonProcessor(transform));
-                    dag.edge(between(prev, filter));
+                    dag.edge(between(prev, filter.localParallelism(parallelism)));
                     prev = filter;
                     break;
                 case "flat_map":
                     Vertex flatMap = dag.newVertex(uniqueVertexName("flatMap"), () -> new PythonProcessor(transform));
-                    dag.edge(between(prev, flatMap));
+                    dag.edge(between(prev, flatMap.localParallelism(parallelism)));
                     prev = flatMap;
                     break;
                 case "map":
-                    Vertex map = dag.newVertex(uniqueVertexName("map"), () -> new PythonProcessor(transform))
-                                    .localParallelism(1);
-                    dag.edge(between(prev, map));
+                    Vertex map = dag.newVertex(uniqueVertexName("map"), () -> new PythonProcessor(transform));
+                    dag.edge(between(prev, map.localParallelism(parallelism)));
                     prev = map;
                     break;
                 case "reduce":
                     Transform accumulateT = new Transform("accumulate",
                             new ArrayList(asList(transform.getParam(0), transform.getParam(1))));
                     Transform combineT = new Transform("combine",
-                            new ArrayList(asList((Object)transform.getParam(2))));
+                            new ArrayList(asList((Object) transform.getParam(2))));
                     Vertex accumulate = dag.newVertex(uniqueVertexName("accumulate"), () -> new PythonProcessor(accumulateT));
                     Vertex combine = dag.newVertex(uniqueVertexName("combine"), () -> new PythonProcessor(combineT));
-                    dag.edge(between(prev, accumulate).partitioned(entryKey()));
-                    dag.edge(between(accumulate, combine).distributed().partitioned(entryKey()));
+                    dag.edge(between(prev, accumulate.localParallelism(parallelism)).partitioned(entryKey()));
+                    dag.edge(between(accumulate, combine.localParallelism(parallelism)).distributed().partitioned(entryKey()));
                     prev = combine;
                     break;
                 case "write_map": {
@@ -88,6 +102,18 @@ public class PipeExecutor {
                     dag.edge(between(prev, sink));
                     break;
                 }
+                case "write_list": {
+                    String listName = transform.getParam(0);
+                    if (prev == null) {
+                        throw
+                                new IllegalStateException("prev vertex is null");
+                    }
+                    Vertex sink = dag.newVertex("write-" + listName, Sinks.writeList(listName)).localParallelism(1);
+                    dag.edge(between(prev, sink));
+                    break;
+                }
+                default:
+                    throw new IllegalArgumentException("Unknown transform " + transform.getName());
             }
         }
         return dag;
