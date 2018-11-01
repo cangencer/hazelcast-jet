@@ -18,13 +18,20 @@ package com.hazelcast.jet.impl.operation;
 
 import com.hazelcast.jet.function.DistributedBiConsumer;
 import com.hazelcast.jet.impl.JetService;
+import com.hazelcast.nio.ObjectDataInput;
+import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.spi.Operation;
+
+import java.io.IOException;
 
 public class CreateEndpointOperation extends Operation {
 
-    private final long endpointId;
-    private final String name;
-    private final DistributedBiConsumer handler;
+    private long endpointId;
+    private String name;
+    private DistributedBiConsumer handler;
+
+    public CreateEndpointOperation() {
+    }
 
     public CreateEndpointOperation(long endpointId, String name, DistributedBiConsumer handler) {
         this.endpointId = endpointId;
@@ -42,5 +49,19 @@ public class CreateEndpointOperation extends Operation {
         JetService service = getService();
         service.getEndpointService().newEndpoint(endpointId, name, handler);
         super.run();
+    }
+
+    @Override
+    protected void writeInternal(ObjectDataOutput out) throws IOException {
+        out.writeLong(endpointId);
+        out.writeUTF(name);
+        out.writeObject(handler);
+    }
+
+    @Override
+    protected void readInternal(ObjectDataInput in) throws IOException {
+        endpointId = in.readLong();
+        name = in.readUTF();
+        handler = in.readObject();
     }
 }

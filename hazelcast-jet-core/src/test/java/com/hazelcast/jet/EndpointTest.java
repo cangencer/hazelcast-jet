@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet;
 
+import com.hazelcast.config.NetworkConfig;
 import com.hazelcast.jet.config.JetConfig;
 import com.hazelcast.jet.datamodel.Tuple2;
 import org.junit.Test;
@@ -28,10 +29,17 @@ public class EndpointTest {
 
     @Test
     public void endpoint() throws InterruptedException {
-        JetInstance instance1 = Jet.newJetInstance();
+        JetConfig memberconfig = new JetConfig();
+        NetworkConfig nwConfig = memberconfig.getHazelcastConfig().getNetworkConfig();
+        nwConfig.getJoin().getMulticastConfig().setEnabled(false);
+        nwConfig.getJoin().getTcpIpConfig().setEnabled(true);
+        nwConfig.getJoin().getTcpIpConfig().addMember("127.0.0.1");
+        memberconfig.getHazelcastConfig().setNetworkConfig(nwConfig);
+        JetInstance instance1 = Jet.newJetInstance(memberconfig);
 
         JetConfig liteMemberConfig = new JetConfig();
         liteMemberConfig.getHazelcastConfig().setLiteMember(true);
+        liteMemberConfig.getHazelcastConfig().setNetworkConfig(nwConfig);
         JetInstance liteMember = Jet.newJetInstance(liteMemberConfig);
 
         instance1.newEndpoint("sum", (Tuple2<Integer, Integer> t, CompletableFuture<Integer> f) ->

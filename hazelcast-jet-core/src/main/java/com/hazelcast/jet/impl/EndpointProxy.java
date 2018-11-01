@@ -65,6 +65,8 @@ public class EndpointProxy<I, O> implements IEndpoint<I, O> {
     public CompletableFuture<O> callAsync(I request) {
         // pick a member to execute the request on
         Connection connection = participants[participantIndex.incrementAndGet() % participants.length];
+
+        
         return null;
     }
 

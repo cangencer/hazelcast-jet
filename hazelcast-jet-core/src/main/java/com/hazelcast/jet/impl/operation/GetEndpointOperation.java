@@ -17,11 +17,19 @@
 package com.hazelcast.jet.impl.operation;
 
 import com.hazelcast.jet.impl.JetService;
+import com.hazelcast.nio.ObjectDataInput;
+import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.spi.Operation;
+
+import java.io.IOException;
 
 public class GetEndpointOperation extends Operation {
 
-    private final String name;
+    private String name;
+    private long response;
+
+    public GetEndpointOperation() {
+    }
 
     public GetEndpointOperation(String name) {
         this.name = name;
@@ -35,6 +43,21 @@ public class GetEndpointOperation extends Operation {
     @Override
     public void run() throws Exception {
         JetService service = getService();
-        sendResponse(service.getEndpointService().getEndpointId(name));
+        response = service.getEndpointService().getEndpointId(name);
+    }
+
+    @Override
+    public Object getResponse() {
+        return response;
+    }
+
+    @Override
+    protected void writeInternal(ObjectDataOutput out) throws IOException {
+        out.writeUTF(name);
+    }
+
+    @Override
+    protected void readInternal(ObjectDataInput in) throws IOException {
+       name = in.readUTF();
     }
 }
