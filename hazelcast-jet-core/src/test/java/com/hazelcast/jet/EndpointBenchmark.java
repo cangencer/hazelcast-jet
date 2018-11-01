@@ -22,6 +22,7 @@ import com.hazelcast.jet.datamodel.Tuple2;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -51,9 +52,7 @@ public class EndpointBenchmark {
         liteMemberConfig.getHazelcastConfig().setNetworkConfig(nwConfig);
         liteMember = Jet.newJetInstance(liteMemberConfig);
 
-        instance.<Tuple2<Integer, Integer>, Integer>newEndpoint("sum", (t, f) -> {
-            f.complete(t.f0() + t.f1());
-        });
+        instance.<Tuple2<Integer, Integer>, Integer>newEndpoint("sum", (c, t) -> CompletableFuture.completedFuture(t.f0() + t.f1()));
 
         endpoint = liteMember.getEndpoint("sum");
     }
@@ -70,7 +69,7 @@ public class EndpointBenchmark {
     @Test
     public void testSync() {
         long start = System.nanoTime();
-        int interval = 5_000;
+        int interval = 50;
         int i = 0;
         while(true) {
             if (i++ % interval == 0) {

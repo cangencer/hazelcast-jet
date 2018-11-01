@@ -17,11 +17,13 @@
 package com.hazelcast.jet.impl;
 
 import com.hazelcast.internal.util.concurrent.MPSCQueue;
+import com.hazelcast.jet.JetInstance;
 import com.hazelcast.jet.datamodel.Tuple2;
-import com.hazelcast.jet.function.DistributedBiConsumer;
+import com.hazelcast.jet.function.DistributedBiFunction;
 import com.hazelcast.jet.impl.execution.Tasklet;
 import com.hazelcast.jet.impl.execution.TaskletExecutionService;
 import com.hazelcast.jet.impl.util.ProgressState;
+import com.hazelcast.jet.pipeline.ContextFactory;
 import com.hazelcast.nio.Address;
 import com.hazelcast.nio.BufferObjectDataInput;
 
@@ -39,20 +41,26 @@ import static java.util.Arrays.asList;
 
 public class EndpointContext {
     private final String name;
+    private final JetInstance jetInstance;
     private long endpointId;
-    private final DistributedBiConsumer<Object, CompletableFuture<Object>> consumer;
+    private final ContextFactory contextFactory;
+    private final DistributedBiFunction<Object, Object, CompletableFuture<Object>> handler;
     private final Queue<Tuple2<Address, BufferObjectDataInput>>[] queues;
     private final Networking networking;
     private AtomicInteger queueIndex = new AtomicInteger();
 
     public EndpointContext(String name,
                            long endpointId,
-                           DistributedBiConsumer consumer,
-                           TaskletExecutionService taskletExecutionService, Networking networking) {
+                           ContextFactory contextFactory,
+                           DistributedBiFunction<Object, Object, CompletableFuture<Object>> handler,
+                           TaskletExecutionService taskletExecutionService,
+                           Networking networking,
+                           JetInstance jetInstance) {
         this.name = name;
         this.endpointId = endpointId;
-        this.consumer = consumer;
-
+        this.contextFactory = contextFactory;
+        this.handler = handler;
+        this.jetInstance = jetInstance;
 
         queues = new MPSCQueue[taskletExecutionService.cooperativeThreadCount()];
         this.networking = networking;
@@ -70,9 +78,11 @@ public class EndpointContext {
     public class EndpointTasklet implements Tasklet {
 
         private final Queue<Tuple2<Address, BufferObjectDataInput>> queue;
+        private Object context;
 
         public EndpointTasklet(Queue<Tuple2<Address, BufferObjectDataInput>> queue) {
             this.queue = queue;
+            context = contextFactory.createFn().apply(jetInstance);
         }
 
         public ProgressState call() {
@@ -85,8 +95,7 @@ public class EndpointContext {
             try {
                 long requestId = serialized.readLong();
                 Object input = serialized.readObject();
-                CompletableFuture future = new CompletableFuture();
-                consumer.accept(input, future);
+                CompletableFuture future = handler.apply(context, input);
                 future.whenComplete((r, t) -> {
                     try {
                         networking.sendRpcResponse(caller, endpointId, requestId, t == null ? r : t);

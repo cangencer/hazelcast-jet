@@ -34,10 +34,11 @@ import com.hazelcast.jet.config.JetConfig;
 import com.hazelcast.jet.config.JobConfig;
 import com.hazelcast.jet.core.DAG;
 import com.hazelcast.jet.core.JobNotFoundException;
-import com.hazelcast.jet.function.DistributedBiConsumer;
+import com.hazelcast.jet.function.DistributedBiFunction;
 import com.hazelcast.jet.impl.metrics.management.ConcurrentArrayRingbuffer.RingbufferSlice;
 import com.hazelcast.jet.impl.metrics.management.MetricsResultSet;
 import com.hazelcast.jet.impl.util.ExceptionUtil;
+import com.hazelcast.jet.pipeline.ContextFactory;
 import com.hazelcast.nio.Address;
 import com.hazelcast.spi.serialization.SerializationService;
 
@@ -83,7 +84,8 @@ public class JetClientInstanceImpl extends AbstractJetInstance {
 
     @Nonnull
     @Override
-    public <I, O> IEndpoint<I, O> newEndpoint(String name, DistributedBiConsumer<I, CompletableFuture<O>> handler) {
+    public <C, I, O> IEndpoint<I, O> newEndpoint(String name, ContextFactory<C> contextFactory,
+                                          DistributedBiFunction<C, I, CompletableFuture<O>> handler) {
         throw new UnsupportedOperationException();
     }
 

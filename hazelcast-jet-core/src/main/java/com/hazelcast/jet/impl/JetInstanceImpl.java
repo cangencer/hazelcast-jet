@@ -24,10 +24,11 @@ import com.hazelcast.jet.config.JetConfig;
 import com.hazelcast.jet.config.JobConfig;
 import com.hazelcast.jet.core.DAG;
 import com.hazelcast.jet.core.JobNotFoundException;
-import com.hazelcast.jet.function.DistributedBiConsumer;
+import com.hazelcast.jet.function.DistributedBiFunction;
 import com.hazelcast.jet.impl.operation.GetEndpointOperation;
 import com.hazelcast.jet.impl.operation.GetJobIdsByNameOperation;
 import com.hazelcast.jet.impl.operation.GetJobIdsOperation;
+import com.hazelcast.jet.pipeline.ContextFactory;
 import com.hazelcast.nio.Address;
 import com.hazelcast.spi.NodeEngine;
 import com.hazelcast.spi.impl.NodeEngineImpl;
@@ -77,9 +78,11 @@ public class JetInstanceImpl extends AbstractJetInstance {
 
     @Nonnull
     @Override
-    public <I, O> IEndpoint<I, O> newEndpoint(String name, DistributedBiConsumer<I, CompletableFuture<O>> handler) {
+    public <C, I, O> IEndpoint<I, O> newEndpoint(String name,
+                                                 ContextFactory<C> contextFactory,
+                                                 DistributedBiFunction<C, I, CompletableFuture<O>> handler) {
         JetService service = getJetService();
-        EndpointProxy<I, O> proxy = new EndpointProxy<>(nodeEngine, name, handler);
+        EndpointProxy<C, I, O> proxy = new EndpointProxy<>(nodeEngine, name, contextFactory, handler);
         service.getEndpointService().registerProxy(proxy);
         return proxy;
     }

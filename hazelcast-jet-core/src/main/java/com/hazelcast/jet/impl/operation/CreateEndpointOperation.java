@@ -16,26 +16,31 @@
 
 package com.hazelcast.jet.impl.operation;
 
-import com.hazelcast.jet.function.DistributedBiConsumer;
+import com.hazelcast.jet.function.DistributedBiFunction;
 import com.hazelcast.jet.impl.JetService;
+import com.hazelcast.jet.pipeline.ContextFactory;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.spi.Operation;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
 
 public class CreateEndpointOperation extends Operation {
 
     private long endpointId;
     private String name;
-    private DistributedBiConsumer handler;
+    private ContextFactory contextFactory;
+    private DistributedBiFunction<Object, Object, CompletableFuture<Object>> handler;
 
     public CreateEndpointOperation() {
     }
 
-    public CreateEndpointOperation(long endpointId, String name, DistributedBiConsumer handler) {
+    public CreateEndpointOperation(long endpointId, String name, ContextFactory contextFactory,
+                                   DistributedBiFunction<Object, Object, CompletableFuture<Object>> handler) {
         this.endpointId = endpointId;
         this.name = name;
+        this.contextFactory = contextFactory;
         this.handler = handler;
     }
 
@@ -47,7 +52,7 @@ public class CreateEndpointOperation extends Operation {
     @Override
     public void run() throws Exception {
         JetService service = getService();
-        service.getEndpointService().newEndpoint(endpointId, name, handler);
+        service.getEndpointService().newEndpoint(endpointId, name, contextFactory, handler);
         super.run();
     }
 
@@ -55,6 +60,7 @@ public class CreateEndpointOperation extends Operation {
     protected void writeInternal(ObjectDataOutput out) throws IOException {
         out.writeLong(endpointId);
         out.writeUTF(name);
+        out.writeObject(contextFactory);
         out.writeObject(handler);
     }
 
@@ -62,6 +68,7 @@ public class CreateEndpointOperation extends Operation {
     protected void readInternal(ObjectDataInput in) throws IOException {
         endpointId = in.readLong();
         name = in.readUTF();
+        contextFactory = in.readObject();
         handler = in.readObject();
     }
 }
