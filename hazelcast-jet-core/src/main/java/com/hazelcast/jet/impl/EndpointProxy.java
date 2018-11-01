@@ -21,15 +21,24 @@ import com.hazelcast.flakeidgen.FlakeIdGenerator;
 import com.hazelcast.jet.IEndpoint;
 import com.hazelcast.jet.function.DistributedBiConsumer;
 import com.hazelcast.jet.impl.operation.CreateEndpointOperation;
+import com.hazelcast.nio.BufferObjectDataInput;
+import com.hazelcast.nio.BufferObjectDataOutput;
 import com.hazelcast.nio.Connection;
+import com.hazelcast.nio.Packet;
 import com.hazelcast.spi.NodeEngine;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static com.hazelcast.cluster.memberselector.MemberSelectors.DATA_MEMBER_SELECTOR;
+import static com.hazelcast.jet.impl.util.ExceptionUtil.rethrow;
+import static com.hazelcast.jet.impl.util.Util.createObjectDataOutput;
 import static com.hazelcast.jet.impl.util.Util.getMemberConnection;
+import static com.hazelcast.nio.Packet.FLAG_URGENT;
 
 public class EndpointProxy<I, O> implements IEndpoint<I, O> {
 
@@ -38,8 +47,9 @@ public class EndpointProxy<I, O> implements IEndpoint<I, O> {
     private long endpointId;
     private Connection[] participants;
 
-    private final AtomicInteger participantIndex = new AtomicInteger();
-    private final AtomicInteger sequence = new AtomicInteger();
+    private final AtomicLong sequence = new AtomicLong();
+
+    private final ConcurrentMap<Long, CompletableFuture> requests = new ConcurrentHashMap<>();
 
     public EndpointProxy(long endpointId, String name) {
         this.endpointId = endpointId;
@@ -64,10 +74,23 @@ public class EndpointProxy<I, O> implements IEndpoint<I, O> {
     @Override
     public CompletableFuture<O> callAsync(I request) {
         // pick a member to execute the request on
-        Connection connection = participants[participantIndex.incrementAndGet() % participants.length];
+        long requestId = sequence.getAndIncrement();
+        Connection connection = participants[(int) Math.floorMod(requestId, participants.length)];
+        try (BufferObjectDataOutput out = createObjectDataOutput(nodeEngine)) {
+            out.writeLong(endpointId);
+            out.writeLong(requestId);
+            out.writeObject(request);
 
-        
-        return null;
+            connection.write(new Packet(out.toByteArray())
+                    .setPacketType(Packet.Type.JET)
+                    .raiseFlags(FLAG_URGENT | Networking.FLAG_TYPE_RPC_REQUEST));
+        } catch (IOException e) {
+            throw rethrow(e);
+        }
+
+        CompletableFuture future = new CompletableFuture();
+        requests.put(requestId, future);
+        return future;
     }
 
     @Override
@@ -81,5 +104,15 @@ public class EndpointProxy<I, O> implements IEndpoint<I, O> {
 
     public String getName() {
         return name;
+    }
+
+    public void handleResponse(BufferObjectDataInput in) throws IOException {
+        long requestId = in.readLong();
+        CompletableFuture requestFuture = requests.get(requestId);
+        if (requestFuture == null) {
+            throw new IllegalArgumentException("Response for unknown request: " + requestId);
+        }
+        Object response = in.readObject();
+        requestFuture.complete(response);
     }
 }

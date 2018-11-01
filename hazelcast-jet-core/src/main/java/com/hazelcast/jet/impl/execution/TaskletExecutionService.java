@@ -116,7 +116,7 @@ public class TaskletExecutionService {
      * @param cancellationFuture  future that, if cancelled, will cancel the execution of the tasklets
      * @param jobClassLoader      classloader to use when running the tasklets
      */
-    CompletableFuture<Void> beginExecute(
+    public CompletableFuture<Void> beginExecute(
             @Nonnull List<? extends Tasklet> tasklets,
             @Nonnull CompletableFuture<Void> cancellationFuture,
             @Nonnull ClassLoader jobClassLoader
@@ -405,4 +405,7 @@ public class TaskletExecutionService {
         }
     }
 
+    public int cooperativeThreadCount() {
+        return cooperativeWorkers.length;
+    }
 }

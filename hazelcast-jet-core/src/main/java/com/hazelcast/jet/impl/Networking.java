@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ScheduledFuture;
 
+import static com.hazelcast.jet.impl.util.ExceptionUtil.rethrow;
 import static com.hazelcast.jet.impl.util.ExceptionUtil.sneakyThrow;
 import static com.hazelcast.jet.impl.util.Util.createObjectDataInput;
 import static com.hazelcast.jet.impl.util.Util.createObjectDataOutput;
@@ -44,17 +45,24 @@ import static com.hazelcast.nio.Packet.FLAG_URGENT;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public class Networking {
+    public static final int FLAG_TYPE_STREAM_PACKET = 0;
+    public static final int FLAG_TYPE_FLOW_CONTROL = 1;
+    public static final int FLAG_TYPE_RPC_REQUEST = 2;
+    public static final int FLAG_TYPE_RPC_RESPONSE = 3;
+
     private static final byte[] EMPTY_BYTES = new byte[0];
 
     private final NodeEngineImpl nodeEngine;
     private final ILogger logger;
     private final JobExecutionService jobExecutionService;
+    private final EndpointService endpointService;
     private final ScheduledFuture<?> flowControlSender;
 
-    Networking(NodeEngine nodeEngine, JobExecutionService jobExecutionService, int flowControlPeriodMs) {
+    Networking(NodeEngine nodeEngine, JobExecutionService jobExecutionService, int flowControlPeriodMs, EndpointService endpointService) {
         this.nodeEngine = (NodeEngineImpl) nodeEngine;
         this.logger = nodeEngine.getLogger(getClass());
         this.jobExecutionService = jobExecutionService;
+        this.endpointService = endpointService;
         this.flowControlSender = nodeEngine.getExecutionService().scheduleWithRepetition(
                 this::broadcastFlowControlPacket, 0, flowControlPeriodMs, MILLISECONDS);
     }
@@ -64,11 +72,36 @@ public class Networking {
     }
 
     void handle(Packet packet) throws IOException {
-        if (!packet.isFlagRaised(FLAG_JET_FLOW_CONTROL)) {
-            handleStreamPacket(packet);
-            return;
+        int flag = packet.getFlags() & 0b11;
+        switch (flag) {
+            case FLAG_TYPE_STREAM_PACKET:
+                handleStreamPacket(packet);
+                break;
+            case FLAG_TYPE_FLOW_CONTROL:
+                handleFlowControlPacket(packet.getConn().getEndPoint(), packet.toByteArray());
+                break;
+            case FLAG_TYPE_RPC_REQUEST:
+                handleRpcRequest(packet.getConn().getEndPoint(), packet.toByteArray());
+                break;
+            case FLAG_TYPE_RPC_RESPONSE:
+                handleRpcResponse(packet.toByteArray());
+                break;
         }
-        handleFlowControlPacket(packet.getConn().getEndPoint(), packet.toByteArray());
+    }
+
+    private void handleRpcResponse(byte[] packetBytes) throws IOException {
+        BufferObjectDataInput in = createObjectDataInput(nodeEngine, packetBytes);
+        long endpointId = in.readLong();
+        EndpointProxy proxy = endpointService.getProxy(endpointId);
+        if (proxy == null) {
+            throw new IllegalArgumentException("Response to unknown endpoint: " + endpointId);
+        }
+        proxy.handleResponse(in);
+    }
+
+    private void handleRpcRequest(Address caller, byte[] packetBytes) throws IOException {
+        BufferObjectDataInput in = createObjectDataInput(nodeEngine, packetBytes);
+        endpointService.execute(caller, in);
     }
 
     private void handleStreamPacket(Packet packet) throws IOException {
@@ -160,6 +193,21 @@ public class Networking {
                 }
             }
         }
+    }
+
+    public void sendRpcResponse(Address caller, long endpointId, long requestId, Object response) {
+        BufferObjectDataOutput out = createObjectDataOutput(nodeEngine);
+        try {
+            out.writeLong(endpointId);
+            out.writeLong(requestId);
+            out.writeObject(response);
+        } catch (IOException e) {
+            throw rethrow(e);
+        }
+        Connection conn = getMemberConnection(nodeEngine, caller);
+        conn.write(new Packet(out.toByteArray())
+                .setPacketType(Packet.Type.JET)
+                .raiseFlags(FLAG_URGENT | FLAG_JET_FLOW_CONTROL));
     }
 
     private void logMissingExeCtx(long executionId) {
