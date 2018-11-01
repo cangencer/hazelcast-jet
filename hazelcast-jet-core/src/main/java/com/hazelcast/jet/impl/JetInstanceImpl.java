@@ -16,12 +16,16 @@
 
 package com.hazelcast.jet.impl;
 
+import com.hazelcast.core.Member;
 import com.hazelcast.instance.HazelcastInstanceImpl;
+import com.hazelcast.jet.IEndpoint;
 import com.hazelcast.jet.Job;
 import com.hazelcast.jet.config.JetConfig;
 import com.hazelcast.jet.config.JobConfig;
 import com.hazelcast.jet.core.DAG;
 import com.hazelcast.jet.core.JobNotFoundException;
+import com.hazelcast.jet.function.DistributedBiConsumer;
+import com.hazelcast.jet.impl.operation.GetEndpointOperation;
 import com.hazelcast.jet.impl.operation.GetJobIdsByNameOperation;
 import com.hazelcast.jet.impl.operation.GetJobIdsOperation;
 import com.hazelcast.nio.Address;
@@ -29,10 +33,13 @@ import com.hazelcast.spi.NodeEngine;
 import com.hazelcast.spi.impl.NodeEngineImpl;
 
 import javax.annotation.Nonnull;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
+import static com.hazelcast.cluster.memberselector.MemberSelectors.DATA_MEMBER_SELECTOR;
 import static com.hazelcast.jet.impl.util.ExceptionUtil.peel;
 import static com.hazelcast.jet.impl.util.Util.uncheckCall;
 import static java.util.stream.Collectors.toList;
@@ -44,15 +51,41 @@ public class JetInstanceImpl extends AbstractJetInstance {
     private final NodeEngine nodeEngine;
     private final JetConfig config;
 
+
     public JetInstanceImpl(HazelcastInstanceImpl hazelcastInstance, JetConfig config) {
         super(hazelcastInstance);
         this.nodeEngine = hazelcastInstance.node.getNodeEngine();
         this.config = config;
+
     }
 
     @Nonnull @Override
     public JetConfig getConfig() {
         return config;
+    }
+
+    @Override
+    public <I, O> IEndpoint<I, O> getEndpoint(String name) {
+        Collection<Member> members = nodeEngine.getClusterService().getMembers(DATA_MEMBER_SELECTOR);
+        Member first = members.iterator().next();
+        long endpointId = (long) nodeEngine.getOperationService()
+                                           .createInvocationBuilder(JetService.SERVICE_NAME, new GetEndpointOperation(name), first.getAddress())
+                                           .invoke().join();
+        EndpointService service = getJetservice().getEndpointService();
+        return service.getOrRegisterProxy(endpointId, () -> new EndpointProxy(endpointId, name));
+    }
+
+    @Nonnull
+    @Override
+    public <I, O> IEndpoint<I, O> newEndpoint(String name, DistributedBiConsumer<I, CompletableFuture<O>> handler) {
+        JetService service = getJetservice();
+        EndpointProxy<I, O> proxy = new EndpointProxy<>(nodeEngine, name, handler);
+        service.getEndpointService().registerProxy(proxy);
+        return proxy;
+    }
+
+    private JetService getJetservice() {
+        return nodeEngine.getService(JetService.SERVICE_NAME);
     }
 
     @Nonnull @Override
@@ -106,7 +139,7 @@ public class JetInstanceImpl extends AbstractJetInstance {
 
     @Override
     public void shutdown() {
-        JetService jetService = nodeEngine.getService(JetService.SERVICE_NAME);
+        JetService jetService = getJetservice();
         jetService.shutDownJobs();
         super.shutdown();
     }

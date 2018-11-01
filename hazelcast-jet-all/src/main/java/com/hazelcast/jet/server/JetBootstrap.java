@@ -19,12 +19,14 @@ package com.hazelcast.jet.server;
 import com.hazelcast.core.Cluster;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ReplicatedMap;
+import com.hazelcast.jet.IEndpoint;
 import com.hazelcast.jet.Jet;
 import com.hazelcast.jet.JetInstance;
 import com.hazelcast.jet.Job;
 import com.hazelcast.jet.config.JetConfig;
 import com.hazelcast.jet.config.JobConfig;
 import com.hazelcast.jet.core.DAG;
+import com.hazelcast.jet.function.DistributedBiConsumer;
 import com.hazelcast.jet.impl.util.Util;
 import com.hazelcast.jet.IListJet;
 import com.hazelcast.jet.IMapJet;
@@ -34,6 +36,7 @@ import javax.annotation.Nonnull;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 import java.util.jar.JarFile;
 
@@ -171,6 +174,17 @@ public final class JetBootstrap {
         @Nonnull @Override
         public JetConfig getConfig() {
             return instance.getConfig();
+        }
+
+        @Nonnull
+        @Override
+        public <I, O> IEndpoint<I, O> newEndpoint(String name, DistributedBiConsumer<I, CompletableFuture<O>> handler) {
+            return instance.newEndpoint(name, handler);
+        }
+
+        @Override
+        public <I, O> IEndpoint<I, O> getEndpoint(String name) {
+            return instance.getEndpoint(name);
         }
 
         @Nonnull @Override

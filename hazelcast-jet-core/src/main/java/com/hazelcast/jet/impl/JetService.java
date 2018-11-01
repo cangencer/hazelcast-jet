@@ -78,6 +78,7 @@ public class JetService
     private JobRepository jobRepository;
     private JobCoordinationService jobCoordinationService;
     private JobExecutionService jobExecutionService;
+    private EndpointService endpointService;
 
     private final AtomicInteger numConcurrentAsyncOps = new AtomicInteger();
 
@@ -117,6 +118,7 @@ public class JetService
         ExceptionUtil.registerJetExceptions(clientEngine.getClientExceptions());
 
         jobCoordinationService.init();
+        endpointService = new EndpointService(taskletExecutionService);
 
         if (Boolean.parseBoolean(properties.getProperty(SHUTDOWNHOOK_ENABLED.getName()))) {
             logger.finest("Adding Jet shutdown hook");
@@ -219,6 +221,9 @@ public class JetService
         return jobExecutionService;
     }
 
+    public EndpointService getEndpointService() {
+        return endpointService;
+    }
     /**
      * Returns the job config or fails with {@link JobNotFoundException}
      * if the requested job is not found.

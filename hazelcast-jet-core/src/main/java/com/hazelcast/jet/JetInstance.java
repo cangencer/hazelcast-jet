@@ -22,6 +22,7 @@ import com.hazelcast.core.ReplicatedMap;
 import com.hazelcast.jet.config.JetConfig;
 import com.hazelcast.jet.config.JobConfig;
 import com.hazelcast.jet.core.DAG;
+import com.hazelcast.jet.function.DistributedBiConsumer;
 import com.hazelcast.jet.function.DistributedBiFunction;
 import com.hazelcast.jet.pipeline.GeneralStage;
 import com.hazelcast.jet.pipeline.Pipeline;
@@ -29,6 +30,7 @@ import com.hazelcast.jet.pipeline.Pipeline;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Represents either an instance of a Jet server node or a Jet client
@@ -62,6 +64,11 @@ public interface JetInstance {
      */
     @Nonnull
     JetConfig getConfig();
+
+    @Nonnull
+    <I, O> IEndpoint<I, O> newEndpoint(String name, DistributedBiConsumer<I, CompletableFuture<O>> handler);
+
+    <I, O> IEndpoint<I, O> getEndpoint(String name);
 
     /**
      * Creates and returns a Jet job based on the supplied DAG. Jet will

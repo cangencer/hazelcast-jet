@@ -28,11 +28,13 @@ import com.hazelcast.client.util.ClientDelegatingFuture;
 import com.hazelcast.core.Cluster;
 import com.hazelcast.core.ICompletableFuture;
 import com.hazelcast.core.Member;
+import com.hazelcast.jet.IEndpoint;
 import com.hazelcast.jet.Job;
 import com.hazelcast.jet.config.JetConfig;
 import com.hazelcast.jet.config.JobConfig;
 import com.hazelcast.jet.core.DAG;
 import com.hazelcast.jet.core.JobNotFoundException;
+import com.hazelcast.jet.function.DistributedBiConsumer;
 import com.hazelcast.jet.impl.metrics.management.ConcurrentArrayRingbuffer.RingbufferSlice;
 import com.hazelcast.jet.impl.metrics.management.MetricsResultSet;
 import com.hazelcast.jet.impl.util.ExceptionUtil;
@@ -43,6 +45,7 @@ import javax.annotation.Nonnull;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 import static com.hazelcast.jet.impl.util.ExceptionUtil.peel;
 import static com.hazelcast.jet.impl.util.Util.uncheckCall;
@@ -76,6 +79,17 @@ public class JetClientInstanceImpl extends AbstractJetInstance {
     @Nonnull @Override
     public JetConfig getConfig() {
         throw new UnsupportedOperationException("Jet Configuration is not available on the client");
+    }
+
+    @Nonnull
+    @Override
+    public <I, O> IEndpoint<I, O> newEndpoint(String name, DistributedBiConsumer<I, CompletableFuture<O>> handler) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public <I, O> IEndpoint<I, O> getEndpoint(String name) {
+        throw new UnsupportedOperationException();
     }
 
     @Nonnull @Override
