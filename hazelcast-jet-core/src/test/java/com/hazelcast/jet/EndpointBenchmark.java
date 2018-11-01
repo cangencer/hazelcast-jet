@@ -59,6 +59,15 @@ public class EndpointBenchmark {
     }
 
     @Test
+    public void demo() throws InterruptedException {
+        endpoint = liteMember.getEndpoint("sum");
+
+        Integer response = endpoint.call(tuple2(10, 20));
+
+        System.out.println("Response: " + response);
+    }
+
+    @Test
     public void testSync() {
         long start = System.nanoTime();
         int interval = 5_000;
