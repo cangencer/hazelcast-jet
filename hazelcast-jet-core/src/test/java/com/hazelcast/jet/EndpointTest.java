@@ -19,33 +19,37 @@ package com.hazelcast.jet;
 import com.hazelcast.config.NetworkConfig;
 import com.hazelcast.jet.config.JetConfig;
 import com.hazelcast.jet.datamodel.Tuple2;
+import org.junit.Before;
 import org.junit.Test;
-
-import java.util.concurrent.CompletableFuture;
 
 import static com.hazelcast.jet.datamodel.Tuple2.tuple2;
 
 public class EndpointTest {
 
-    @Test
-    public void endpoint() throws InterruptedException {
-        JetConfig memberconfig = new JetConfig();
-        NetworkConfig nwConfig = memberconfig.getHazelcastConfig().getNetworkConfig();
+    private JetInstance instance;
+    private JetInstance liteMember;
+
+    @Before
+    public void setup() {
+        JetConfig memberConfig = new JetConfig();
+        NetworkConfig nwConfig = memberConfig.getHazelcastConfig().getNetworkConfig();
         nwConfig.getJoin().getMulticastConfig().setEnabled(false);
         nwConfig.getJoin().getTcpIpConfig().setEnabled(true);
         nwConfig.getJoin().getTcpIpConfig().addMember("127.0.0.1");
-        memberconfig.getHazelcastConfig().setNetworkConfig(nwConfig);
-        JetInstance instance1 = Jet.newJetInstance(memberconfig);
+        memberConfig.getHazelcastConfig().setNetworkConfig(nwConfig);
+        instance = Jet.newJetInstance(memberConfig);
 
         JetConfig liteMemberConfig = new JetConfig();
         liteMemberConfig.getHazelcastConfig().setLiteMember(true);
         liteMemberConfig.getHazelcastConfig().setNetworkConfig(nwConfig);
-        JetInstance liteMember = Jet.newJetInstance(liteMemberConfig);
+        liteMember = Jet.newJetInstance(liteMemberConfig);
 
-        instance1.newEndpoint("sum", (Tuple2<Integer, Integer> t, CompletableFuture<Integer> f) ->
-                f.complete(t.f0() + t.f1()));
+        instance.<Tuple2<Integer, Integer>, Integer>newEndpoint("sum", (t, f) -> f.complete(t.f0() + t.f1()));
+    }
 
-
-        liteMember.<Tuple2<Integer, Integer>, Integer>getEndpoint("sum").call(tuple2(1, 2));
+    @Test
+    public void endpoint() {
+        IEndpoint<Tuple2<Integer, Integer>, Integer> endpoint = liteMember.getEndpoint("sum");
+        endpoint.call(tuple2(1, 2));
     }
 }
