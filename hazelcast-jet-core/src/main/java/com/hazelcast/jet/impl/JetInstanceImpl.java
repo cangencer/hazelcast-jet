@@ -72,7 +72,7 @@ public class JetInstanceImpl extends AbstractJetInstance {
                                            .createInvocationBuilder(JetService.SERVICE_NAME, new GetEndpointOperation(name), first.getAddress())
                                            .invoke().join();
         EndpointService service = getJetService().getEndpointService();
-        return service.getOrRegisterProxy(endpointId, () -> new EndpointProxy(endpointId, name));
+        return service.getOrRegisterProxy(endpointId, () -> new EndpointProxy(nodeEngine, endpointId, name));
     }
 
     @Nonnull

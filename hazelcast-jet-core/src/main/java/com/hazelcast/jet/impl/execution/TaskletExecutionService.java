@@ -62,7 +62,7 @@ import static java.util.stream.Collectors.toList;
 public class TaskletExecutionService {
 
     private static final IdleStrategy IDLER_COOPERATIVE =
-            new BackoffIdleStrategy(0, 0, MICROSECONDS.toNanos(1), MILLISECONDS.toNanos(1));
+            new BackoffIdleStrategy(0, 0, MICROSECONDS.toNanos(1), MICROSECONDS.toNanos(100));
     private static final IdleStrategy IDLER_NON_COOPERATIVE =
             new BackoffIdleStrategy(0, 0, MICROSECONDS.toNanos(1), MILLISECONDS.toNanos(5));
 

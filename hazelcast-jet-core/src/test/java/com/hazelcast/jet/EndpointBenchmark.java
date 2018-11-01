@@ -51,7 +51,9 @@ public class EndpointBenchmark {
         liteMemberConfig.getHazelcastConfig().setNetworkConfig(nwConfig);
         liteMember = Jet.newJetInstance(liteMemberConfig);
 
-        instance.<Tuple2<Integer, Integer>, Integer>newEndpoint("sum", (t, f) -> f.complete(t.f0() + t.f1()));
+        instance.<Tuple2<Integer, Integer>, Integer>newEndpoint("sum", (t, f) -> {
+            f.complete(t.f0() + t.f1());
+        });
 
         endpoint = liteMember.getEndpoint("sum");
     }

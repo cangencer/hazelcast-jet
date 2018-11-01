@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.hazelcast.jet.datamodel.Tuple2.tuple2;
 import static com.hazelcast.jet.impl.util.ExceptionUtil.rethrow;
@@ -38,14 +39,20 @@ import static java.util.Arrays.asList;
 
 public class EndpointContext {
     private final String name;
+    private long endpointId;
     private final DistributedBiConsumer<Object, CompletableFuture<Object>> consumer;
     private final Queue<Tuple2<Address, BufferObjectDataInput>>[] queues;
     private final Networking networking;
-    private int queueIndex;
+    private AtomicInteger queueIndex = new AtomicInteger();
 
-    public EndpointContext(String name, DistributedBiConsumer consumer, TaskletExecutionService taskletExecutionService, Networking networking) {
+    public EndpointContext(String name,
+                           long endpointId,
+                           DistributedBiConsumer consumer,
+                           TaskletExecutionService taskletExecutionService, Networking networking) {
         this.name = name;
+        this.endpointId = endpointId;
         this.consumer = consumer;
+
 
         queues = new MPSCQueue[taskletExecutionService.cooperativeThreadCount()];
         this.networking = networking;
@@ -56,7 +63,8 @@ public class EndpointContext {
     }
 
     public void handleRequest(Address caller, BufferObjectDataInput in) {
-        queues[queueIndex++ % queues.length].add(tuple2(caller, in));
+        int i = queueIndex.getAndIncrement() % queues.length;
+        queues[i].add(tuple2(caller, in));
     }
 
     public class EndpointTasklet implements Tasklet {
@@ -69,17 +77,23 @@ public class EndpointContext {
 
         public ProgressState call() {
             Tuple2<Address, BufferObjectDataInput> inputItem = queue.poll();
-            Address caller = inputItem.f0();
-            BufferObjectDataInput serialized = inputItem.f1();
             if (inputItem == null) {
                 return NO_PROGRESS;
             }
+            Address caller = inputItem.f0();
+            BufferObjectDataInput serialized = inputItem.f1();
             try {
                 long requestId = serialized.readLong();
                 Object input = serialized.readObject();
                 CompletableFuture future = new CompletableFuture();
                 consumer.accept(input, future);
-                future.whenComplete((r, t) -> networking.sendRpcResponse(caller, requestId, t == null ? r : t));
+                future.whenComplete((r, t) -> {
+                    try {
+                        networking.sendRpcResponse(caller, endpointId, requestId, t == null ? r : t);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                });
             } catch (IOException e) {
                 throw rethrow(e);
             }

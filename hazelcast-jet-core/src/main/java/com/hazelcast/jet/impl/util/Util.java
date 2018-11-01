@@ -200,7 +200,7 @@ public final class Util {
     }
 
     public static Connection getMemberConnection(@Nonnull NodeEngine engine, @Nonnull Address memberAddr) {
-        return ((NodeEngineImpl) engine).getNode().getConnectionManager().getConnection(memberAddr);
+        return ((NodeEngineImpl) engine).getNode().getConnectionManager().getOrConnect(memberAddr);
     }
 
     public static JetInstance getJetInstance(NodeEngine nodeEngine) {

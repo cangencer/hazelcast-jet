@@ -25,6 +25,7 @@ import com.hazelcast.nio.BufferObjectDataInput;
 import com.hazelcast.nio.BufferObjectDataOutput;
 import com.hazelcast.nio.Connection;
 import com.hazelcast.nio.Packet;
+import com.hazelcast.nio.Packet.Type;
 import com.hazelcast.spi.NodeEngine;
 
 import java.io.IOException;
@@ -38,7 +39,6 @@ import static com.hazelcast.cluster.memberselector.MemberSelectors.DATA_MEMBER_S
 import static com.hazelcast.jet.impl.util.ExceptionUtil.rethrow;
 import static com.hazelcast.jet.impl.util.Util.createObjectDataOutput;
 import static com.hazelcast.jet.impl.util.Util.getMemberConnection;
-import static com.hazelcast.nio.Packet.FLAG_URGENT;
 
 public class EndpointProxy<I, O> implements IEndpoint<I, O> {
 
@@ -51,9 +51,14 @@ public class EndpointProxy<I, O> implements IEndpoint<I, O> {
 
     private final ConcurrentMap<Long, CompletableFuture> requests = new ConcurrentHashMap<>();
 
-    public EndpointProxy(long endpointId, String name) {
+    public EndpointProxy(NodeEngine nodeEngine, long endpointId, String name) {
+        this.nodeEngine = nodeEngine;
         this.endpointId = endpointId;
         this.name = name;
+        Collection<Member> members = nodeEngine.getClusterService().getMembers(DATA_MEMBER_SELECTOR);
+        participants = members.stream()
+                              .filter(m -> !m.localMember())
+                              .map(m -> getMemberConnection(nodeEngine, m.getAddress())).toArray(Connection[]::new);
     }
 
     public EndpointProxy(NodeEngine nodeEngine, String name, DistributedBiConsumer<I, CompletableFuture<O>> handler) {
@@ -61,7 +66,9 @@ public class EndpointProxy<I, O> implements IEndpoint<I, O> {
         this.name = name;
         FlakeIdGenerator idGenerator = nodeEngine.getHazelcastInstance().getFlakeIdGenerator("endpoints");
         Collection<Member> members = nodeEngine.getClusterService().getMembers(DATA_MEMBER_SELECTOR);
-        participants = members.stream().map(m -> getMemberConnection(nodeEngine, m.getAddress())).toArray(Connection[]::new);
+        participants = members.stream()
+                .filter(m -> !m.localMember())
+                .map(m -> getMemberConnection(nodeEngine, m.getAddress())).toArray(Connection[]::new);
         endpointId = idGenerator.newId();
         CreateEndpointOperation op = new CreateEndpointOperation(endpointId, name, handler);
         for (Member member : members) {
@@ -76,20 +83,20 @@ public class EndpointProxy<I, O> implements IEndpoint<I, O> {
         // pick a member to execute the request on
         long requestId = sequence.getAndIncrement();
         Connection connection = participants[(int) Math.floorMod(requestId, participants.length)];
+        CompletableFuture future = new CompletableFuture();
+        requests.put(requestId, future);
         try (BufferObjectDataOutput out = createObjectDataOutput(nodeEngine)) {
+            out.writeByte(Networking.FLAG_TYPE_RPC_REQUEST);
             out.writeLong(endpointId);
             out.writeLong(requestId);
             out.writeObject(request);
 
-            connection.write(new Packet(out.toByteArray())
-                    .setPacketType(Packet.Type.JET)
-                    .raiseFlags(FLAG_URGENT | Networking.FLAG_TYPE_RPC_REQUEST));
+            Packet p = new Packet(out.toByteArray())
+                    .setPacketType(Type.JET);
+            connection.write(p);
         } catch (IOException e) {
             throw rethrow(e);
         }
-
-        CompletableFuture future = new CompletableFuture();
-        requests.put(requestId, future);
         return future;
     }
 
@@ -108,7 +115,7 @@ public class EndpointProxy<I, O> implements IEndpoint<I, O> {
 
     public void handleResponse(BufferObjectDataInput in) throws IOException {
         long requestId = in.readLong();
-        CompletableFuture requestFuture = requests.get(requestId);
+        CompletableFuture requestFuture = requests.remove(requestId);
         if (requestFuture == null) {
             throw new IllegalArgumentException("Response for unknown request: " + requestId);
         }

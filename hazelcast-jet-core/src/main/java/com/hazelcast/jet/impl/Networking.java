@@ -47,6 +47,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 public class Networking {
     public static final int FLAG_TYPE_STREAM_PACKET = 0;
     public static final int FLAG_TYPE_FLOW_CONTROL = 1;
+
     public static final int FLAG_TYPE_RPC_REQUEST = 2;
     public static final int FLAG_TYPE_RPC_RESPONSE = 3;
 
@@ -63,6 +64,7 @@ public class Networking {
         this.logger = nodeEngine.getLogger(getClass());
         this.jobExecutionService = jobExecutionService;
         this.endpointService = endpointService;
+        endpointService.setNetworking(this);
         this.flowControlSender = nodeEngine.getExecutionService().scheduleWithRepetition(
                 this::broadcastFlowControlPacket, 0, flowControlPeriodMs, MILLISECONDS);
     }
@@ -72,8 +74,8 @@ public class Networking {
     }
 
     void handle(Packet packet) throws IOException {
-        int flag = packet.getFlags() & 0b11;
-        switch (flag) {
+        int messageType = packet.toByteArray()[0];
+        switch (messageType) {
             case FLAG_TYPE_STREAM_PACKET:
                 handleStreamPacket(packet);
                 break;
@@ -91,6 +93,7 @@ public class Networking {
 
     private void handleRpcResponse(byte[] packetBytes) throws IOException {
         BufferObjectDataInput in = createObjectDataInput(nodeEngine, packetBytes);
+        in.readByte();
         long endpointId = in.readLong();
         EndpointProxy proxy = endpointService.getProxy(endpointId);
         if (proxy == null) {
@@ -101,6 +104,7 @@ public class Networking {
 
     private void handleRpcRequest(Address caller, byte[] packetBytes) throws IOException {
         BufferObjectDataInput in = createObjectDataInput(nodeEngine, packetBytes);
+        in.readByte();
         endpointService.execute(caller, in);
     }
 
@@ -147,6 +151,7 @@ public class Networking {
     private byte[] createFlowControlPacket(Address member) throws IOException {
         try (BufferObjectDataOutput out = createObjectDataOutput(nodeEngine)) {
             final boolean[] hasData = {false};
+            out.writeByte(FLAG_TYPE_FLOW_CONTROL);
             Map<Long, ExecutionContext> executionContexts = jobExecutionService.getExecutionContextsFor(member);
             out.writeInt(executionContexts.size());
             executionContexts.forEach((execId, exeCtx) -> uncheckRun(() -> {
@@ -166,6 +171,7 @@ public class Networking {
 
     private void handleFlowControlPacket(Address fromAddr, byte[] packet) throws IOException {
         try (BufferObjectDataInput in = createObjectDataInput(nodeEngine, packet)) {
+            in.readByte();
             final int executionCtxCount = in.readInt();
             for (int j = 0; j < executionCtxCount; j++) {
                 final long executionId = in.readLong();
@@ -198,6 +204,7 @@ public class Networking {
     public void sendRpcResponse(Address caller, long endpointId, long requestId, Object response) {
         BufferObjectDataOutput out = createObjectDataOutput(nodeEngine);
         try {
+            out.writeByte(Networking.FLAG_TYPE_RPC_RESPONSE);
             out.writeLong(endpointId);
             out.writeLong(requestId);
             out.writeObject(response);
@@ -207,7 +214,7 @@ public class Networking {
         Connection conn = getMemberConnection(nodeEngine, caller);
         conn.write(new Packet(out.toByteArray())
                 .setPacketType(Packet.Type.JET)
-                .raiseFlags(FLAG_URGENT | FLAG_JET_FLOW_CONTROL));
+                .raiseFlags(FLAG_TYPE_RPC_RESPONSE));
     }
 
     private void logMissingExeCtx(long executionId) {

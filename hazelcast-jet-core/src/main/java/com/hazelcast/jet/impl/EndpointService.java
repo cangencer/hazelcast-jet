@@ -29,7 +29,6 @@ import java.util.function.Supplier;
 public class EndpointService {
 
     private final TaskletExecutionService taskletExecutionService;
-    private final Networking networking;
 
     private final ConcurrentMap<String, Long> nameToIds = new ConcurrentHashMap<>();
     // for server
@@ -37,16 +36,17 @@ public class EndpointService {
     // for client
     private final ConcurrentMap<Long, EndpointProxy> proxies = new ConcurrentHashMap<>();
 
-    public EndpointService(TaskletExecutionService taskletExecutionService, Networking networking) {
+    private Networking networking;
+
+    public EndpointService(TaskletExecutionService taskletExecutionService) {
         this.taskletExecutionService = taskletExecutionService;
-        this.networking = networking;
     }
 
     public void newEndpoint(long id, String name, DistributedBiConsumer consumer) {
         if (nameToIds.putIfAbsent(name, id) != null) {
             throw new IllegalArgumentException("Duplicate name " + name);
         }
-        endpoints.putIfAbsent(id, new EndpointContext(name, consumer, taskletExecutionService, networking));
+        endpoints.putIfAbsent(id, new EndpointContext(name, id, consumer, taskletExecutionService, networking));
     }
 
     public long getEndpointId(String name) {
@@ -72,5 +72,9 @@ public class EndpointService {
             throw new IllegalArgumentException("Unknown endpoint: " + endpointId);
         }
         endpointContext.handleRequest(caller, in);
+    }
+
+    public void setNetworking(Networking networking) {
+        this.networking = networking;
     }
 }
