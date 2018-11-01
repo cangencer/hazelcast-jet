@@ -19,8 +19,9 @@ package com.hazelcast.jet.impl;
 import com.hazelcast.core.Member;
 import com.hazelcast.flakeidgen.FlakeIdGenerator;
 import com.hazelcast.jet.IEndpoint;
-import com.hazelcast.jet.function.DistributedBiConsumer;
+import com.hazelcast.jet.function.DistributedBiFunction;
 import com.hazelcast.jet.impl.operation.CreateEndpointOperation;
+import com.hazelcast.jet.pipeline.ContextFactory;
 import com.hazelcast.nio.BufferObjectDataInput;
 import com.hazelcast.nio.BufferObjectDataOutput;
 import com.hazelcast.nio.Connection;
@@ -40,7 +41,7 @@ import static com.hazelcast.jet.impl.util.ExceptionUtil.rethrow;
 import static com.hazelcast.jet.impl.util.Util.createObjectDataOutput;
 import static com.hazelcast.jet.impl.util.Util.getMemberConnection;
 
-public class EndpointProxy<I, O> implements IEndpoint<I, O> {
+public class EndpointProxy<C, I, O> implements IEndpoint<I, O> {
 
     private NodeEngine nodeEngine;
     private String name;
@@ -61,7 +62,8 @@ public class EndpointProxy<I, O> implements IEndpoint<I, O> {
                               .map(m -> getMemberConnection(nodeEngine, m.getAddress())).toArray(Connection[]::new);
     }
 
-    public EndpointProxy(NodeEngine nodeEngine, String name, DistributedBiConsumer<I, CompletableFuture<O>> handler) {
+    public EndpointProxy(NodeEngine nodeEngine, String name, ContextFactory<C> contextFactory,
+                         DistributedBiFunction<C, I, CompletableFuture<O>> handler) {
         this.nodeEngine = nodeEngine;
         this.name = name;
         FlakeIdGenerator idGenerator = nodeEngine.getHazelcastInstance().getFlakeIdGenerator("endpoints");
@@ -70,7 +72,7 @@ public class EndpointProxy<I, O> implements IEndpoint<I, O> {
                 .filter(m -> !m.localMember())
                 .map(m -> getMemberConnection(nodeEngine, m.getAddress())).toArray(Connection[]::new);
         endpointId = idGenerator.newId();
-        CreateEndpointOperation op = new CreateEndpointOperation(endpointId, name, handler);
+        CreateEndpointOperation op = new CreateEndpointOperation(endpointId, name, contextFactory, (DistributedBiFunction) handler);
         for (Member member : members) {
             this.nodeEngine.getOperationService()
                            .createInvocationBuilder(JetService.SERVICE_NAME, op, member.getAddress())

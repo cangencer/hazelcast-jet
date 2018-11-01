@@ -112,7 +112,7 @@ public class JetService
 
         jobExecutionService = new JobExecutionService(nodeEngine, taskletExecutionService, jobRepository);
         jobCoordinationService = new JobCoordinationService(nodeEngine, this, config, jobRepository);
-        endpointService = new EndpointService(taskletExecutionService);
+        endpointService = new EndpointService(this);
         networking = new Networking(engine, jobExecutionService, config.getInstanceConfig().getFlowControlPeriodMs(), endpointService);
 
         ClientEngineImpl clientEngine = engine.getService(ClientEngineImpl.SERVICE_NAME);
@@ -310,5 +310,13 @@ public class JetService
                 jetInstance.shutdown();
             }
         }, "jet.ShutdownThread");
+    }
+
+    public Networking getNetworking() {
+        return networking;
+    }
+
+    public TaskletExecutionService getTaskletExecutionService() {
+        return taskletExecutionService;
     }
 }

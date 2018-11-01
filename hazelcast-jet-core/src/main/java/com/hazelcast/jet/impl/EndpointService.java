@@ -16,12 +16,15 @@
 
 package com.hazelcast.jet.impl;
 
-import com.hazelcast.jet.function.DistributedBiConsumer;
+import com.hazelcast.jet.JetInstance;
+import com.hazelcast.jet.function.DistributedBiFunction;
 import com.hazelcast.jet.impl.execution.TaskletExecutionService;
+import com.hazelcast.jet.pipeline.ContextFactory;
 import com.hazelcast.nio.Address;
 import com.hazelcast.nio.BufferObjectDataInput;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
@@ -35,18 +38,22 @@ public class EndpointService {
     private final ConcurrentMap<Long, EndpointContext> endpoints = new ConcurrentHashMap<>();
     // for client
     private final ConcurrentMap<Long, EndpointProxy> proxies = new ConcurrentHashMap<>();
+    private final JetInstance jetInstance;
 
     private Networking networking;
 
-    public EndpointService(TaskletExecutionService taskletExecutionService) {
-        this.taskletExecutionService = taskletExecutionService;
+    EndpointService(JetService jetService) {
+        taskletExecutionService = jetService.getTaskletExecutionService();
+        networking = jetService.getNetworking();
+        jetInstance = jetService.getJetInstance();
     }
 
-    public void newEndpoint(long id, String name, DistributedBiConsumer consumer) {
+    public void newEndpoint(long id, String name, ContextFactory contextFactory,
+                            DistributedBiFunction<Object, Object, CompletableFuture<Object>> handler) {
         if (nameToIds.putIfAbsent(name, id) != null) {
             throw new IllegalArgumentException("Duplicate name " + name);
         }
-        endpoints.putIfAbsent(id, new EndpointContext(name, id, consumer, taskletExecutionService, networking));
+        endpoints.putIfAbsent(id, new EndpointContext(name, id, contextFactory, handler, taskletExecutionService, networking, jetInstance));
     }
 
     public long getEndpointId(String name) {
