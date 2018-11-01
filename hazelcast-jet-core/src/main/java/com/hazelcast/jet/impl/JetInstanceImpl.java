@@ -71,20 +71,20 @@ public class JetInstanceImpl extends AbstractJetInstance {
         long endpointId = (long) nodeEngine.getOperationService()
                                            .createInvocationBuilder(JetService.SERVICE_NAME, new GetEndpointOperation(name), first.getAddress())
                                            .invoke().join();
-        EndpointService service = getJetservice().getEndpointService();
+        EndpointService service = getJetService().getEndpointService();
         return service.getOrRegisterProxy(endpointId, () -> new EndpointProxy(endpointId, name));
     }
 
     @Nonnull
     @Override
     public <I, O> IEndpoint<I, O> newEndpoint(String name, DistributedBiConsumer<I, CompletableFuture<O>> handler) {
-        JetService service = getJetservice();
+        JetService service = getJetService();
         EndpointProxy<I, O> proxy = new EndpointProxy<>(nodeEngine, name, handler);
         service.getEndpointService().registerProxy(proxy);
         return proxy;
     }
 
-    private JetService getJetservice() {
+    private JetService getJetService() {
         return nodeEngine.getService(JetService.SERVICE_NAME);
     }
 
@@ -139,7 +139,7 @@ public class JetInstanceImpl extends AbstractJetInstance {
 
     @Override
     public void shutdown() {
-        JetService jetService = getJetservice();
+        JetService jetService = getJetService();
         jetService.shutDownJobs();
         super.shutdown();
     }

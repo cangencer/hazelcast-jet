@@ -18,7 +18,10 @@ package com.hazelcast.jet.impl;
 
 import com.hazelcast.jet.function.DistributedBiConsumer;
 import com.hazelcast.jet.impl.execution.TaskletExecutionService;
+import com.hazelcast.nio.Address;
+import com.hazelcast.nio.BufferObjectDataInput;
 
+import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
@@ -26,22 +29,24 @@ import java.util.function.Supplier;
 public class EndpointService {
 
     private final TaskletExecutionService taskletExecutionService;
+    private final Networking networking;
 
     private final ConcurrentMap<String, Long> nameToIds = new ConcurrentHashMap<>();
+    // for server
     private final ConcurrentMap<Long, EndpointContext> endpoints = new ConcurrentHashMap<>();
-
-
+    // for client
     private final ConcurrentMap<Long, EndpointProxy> proxies = new ConcurrentHashMap<>();
 
-    public EndpointService(TaskletExecutionService taskletExecutionService) {
+    public EndpointService(TaskletExecutionService taskletExecutionService, Networking networking) {
         this.taskletExecutionService = taskletExecutionService;
+        this.networking = networking;
     }
 
     public void newEndpoint(long id, String name, DistributedBiConsumer consumer) {
         if (nameToIds.putIfAbsent(name, id) != null) {
             throw new IllegalArgumentException("Duplicate name " + name);
         }
-        endpoints.putIfAbsent(id, new EndpointContext(name, consumer));
+        endpoints.putIfAbsent(id, new EndpointContext(name, consumer, taskletExecutionService, networking));
     }
 
     public long getEndpointId(String name) {
@@ -52,8 +57,20 @@ public class EndpointService {
         return proxies.computeIfAbsent(endpointId, (k) -> supplier.get());
     }
 
+    public EndpointProxy getProxy(long endpointId) {
+        return proxies.get(endpointId);
+    }
+
     public void registerProxy(EndpointProxy proxy) {
         proxies.putIfAbsent(proxy.getEndpointId(), proxy);
     }
 
+    public void execute(Address caller, BufferObjectDataInput in) throws IOException {
+        long endpointId = in.readLong();
+        EndpointContext endpointContext = endpoints.get(endpointId);
+        if (endpointContext == null) {
+            throw new IllegalArgumentException("Unknown endpoint: " + endpointId);
+        }
+        endpointContext.handleRequest(caller, in);
+    }
 }

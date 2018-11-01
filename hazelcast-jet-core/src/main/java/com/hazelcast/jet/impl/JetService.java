@@ -112,13 +112,13 @@ public class JetService
 
         jobExecutionService = new JobExecutionService(nodeEngine, taskletExecutionService, jobRepository);
         jobCoordinationService = new JobCoordinationService(nodeEngine, this, config, jobRepository);
-        networking = new Networking(engine, jobExecutionService, config.getInstanceConfig().getFlowControlPeriodMs());
+        endpointService = new EndpointService(taskletExecutionService);
+        networking = new Networking(engine, jobExecutionService, config.getInstanceConfig().getFlowControlPeriodMs(), endpointService);
 
         ClientEngineImpl clientEngine = engine.getService(ClientEngineImpl.SERVICE_NAME);
         ExceptionUtil.registerJetExceptions(clientEngine.getClientExceptions());
 
         jobCoordinationService.init();
-        endpointService = new EndpointService(taskletExecutionService);
 
         if (Boolean.parseBoolean(properties.getProperty(SHUTDOWNHOOK_ENABLED.getName()))) {
             logger.finest("Adding Jet shutdown hook");
