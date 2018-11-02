@@ -23,6 +23,7 @@ import com.hazelcast.jet.config.JetConfig;
 import com.hazelcast.jet.config.JobConfig;
 import com.hazelcast.jet.core.DAG;
 import com.hazelcast.jet.function.DistributedBiFunction;
+import com.hazelcast.jet.function.DistributedFunction;
 import com.hazelcast.jet.pipeline.ContextFactory;
 import com.hazelcast.jet.pipeline.GeneralStage;
 import com.hazelcast.jet.pipeline.Pipeline;
@@ -70,8 +71,8 @@ public interface JetInstance {
                                        DistributedBiFunction<C, I, CompletableFuture<O>> handler);
 
     @Nonnull
-    default <I, O> IEndpoint<I, O> newEndpoint(String name, DistributedBiFunction<Object, I, CompletableFuture<O>> handler) {
-        return newEndpoint(name, ContextFactory.withCreateFn(inst -> new Object()), handler);
+    default <I, O> IEndpoint<I, O> newEndpoint(String name, DistributedFunction<I, CompletableFuture<O>> handler) {
+        return newEndpoint(name, ContextFactory.withCreateFn(inst -> new Object()), (c, t) -> handler.apply(t));
     }
 
     <I, O> IEndpoint<I, O> getEndpoint(String name);

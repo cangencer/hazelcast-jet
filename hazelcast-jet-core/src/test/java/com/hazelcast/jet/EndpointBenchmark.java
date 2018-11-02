@@ -17,29 +17,38 @@
 package com.hazelcast.jet;
 
 import com.hazelcast.config.NetworkConfig;
+import com.hazelcast.core.ExecutionCallback;
+import com.hazelcast.core.IExecutorService;
+import com.hazelcast.core.Member;
 import com.hazelcast.jet.config.JetConfig;
 import com.hazelcast.jet.datamodel.Tuple2;
+import com.hazelcast.nio.ObjectDataInput;
+import com.hazelcast.nio.ObjectDataOutput;
+import com.hazelcast.nio.serialization.DataSerializable;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.concurrent.CompletableFuture;
+import java.io.IOException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 
 import static com.hazelcast.jet.datamodel.Tuple2.tuple2;
+import static java.util.concurrent.CompletableFuture.completedFuture;
 
 @SuppressWarnings("Duplicates")
 public class EndpointBenchmark {
 
     private JetInstance instance;
     private JetInstance liteMember;
-    private IEndpoint<Tuple2<Integer, Integer>, Integer> endpoint;
 
     @Before
     public void setup() {
         JetConfig memberConfig = new JetConfig();
+        memberConfig.getInstanceConfig().setCooperativeThreadCount(1);
         NetworkConfig nwConfig = memberConfig.getHazelcastConfig().getNetworkConfig();
         nwConfig.getJoin().getMulticastConfig().setEnabled(false);
         nwConfig.getJoin().getTcpIpConfig().setEnabled(true);
@@ -52,24 +61,45 @@ public class EndpointBenchmark {
         liteMemberConfig.getHazelcastConfig().setNetworkConfig(nwConfig);
         liteMember = Jet.newJetInstance(liteMemberConfig);
 
-        instance.<Tuple2<Integer, Integer>, Integer>newEndpoint("sum", (c, t) -> CompletableFuture.completedFuture(t.f0() + t.f1()));
+        instance.<Tuple2<Integer, Integer>, Integer>newEndpoint("sum", t -> completedFuture(t.f0() + t.f1()));
 
-        endpoint = liteMember.getEndpoint("sum");
     }
 
     @Test
     public void demo() throws InterruptedException {
-        endpoint = liteMember.getEndpoint("sum");
+        instance.newEndpoint("sum",
+                (Tuple2<Integer, Integer> integers) -> completedFuture(integers.f0() + integers.f1())
+        );
+
+        IEndpoint<Tuple2<Integer, Integer>, Integer> endpoint = liteMember.getEndpoint("sum");
 
         Integer response = endpoint.call(tuple2(10, 20));
 
         System.out.println("Response: " + response);
     }
 
+//    @Test
+//    public void demoWithContext() throws InterruptedException {
+//        instance.<HttpClient, Tuple2<Integer, Integer>, Integer>newEndpoint("lookup", httpClient(),
+//                (c, t) -> c.sendAsync(GET(".."), responseInfo -> null).handle((r, th) -> 0));
+//    }
+//
+//    private static HttpRequest GET(String uri) {
+//        return HttpRequest.newBuilder().uri(URI.create(uri)).build();
+//    }
+//
+//    private static ContextFactory<HttpClient> httpClient() {
+//        return ContextFactory
+//                .withCreateFn(jet -> HttpClient.newHttpClient())
+//                .shareLocally();
+//    }
+
+
     @Test
     public void testSync() {
+        IEndpoint<Tuple2<Integer, Integer>, Integer> endpoint = liteMember.getEndpoint("sum");
         long start = System.nanoTime();
-        int interval = 50;
+        int interval = 5_000;
         int i = 0;
         while(true) {
             if (i++ % interval == 0) {
@@ -89,7 +119,7 @@ public class EndpointBenchmark {
         AtomicInteger pendingCount = new AtomicInteger(0);
 
         long start = System.nanoTime();
-        System.out.println("Starting benchmark");
+        IEndpoint<Tuple2<Integer, Integer>, Integer> endpoint = liteMember.getEndpoint("sum");
         ForkJoinPool.commonPool().execute(() -> {
             while (true) {
                 if (pendingCount.get() == 1_000) {
@@ -110,6 +140,95 @@ public class EndpointBenchmark {
             double elapsed = (double) TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
             double reqPerSec = count / elapsed * 1000;
             System.out.printf("%d: %,.3f req/sec\n", count, reqPerSec);
+        }
+    }
+
+
+    @Test
+    public void testExecutorSync() throws ExecutionException, InterruptedException {
+        long start = System.nanoTime();
+        int interval = 5_000;
+        int i = 0;
+        IExecutorService executor = liteMember.getHazelcastInstance().getExecutorService("executor");
+        while(true) {
+            if (i++ % interval == 0) {
+                double elapsed = (double) TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+                double reqPerSec = interval / elapsed * 1000;
+                double msPerReq = elapsed / interval;
+                System.out.printf("%d: %,.3f req/sec %.3fms per request\n", i, reqPerSec, msPerReq);
+                start = System.nanoTime();
+            }
+            Member remoteMember = instance.getHazelcastInstance().getCluster().getLocalMember();
+            executor.submitToMember(new Sum(tuple2(10, 20)), remoteMember).get();
+        }
+    }
+
+    @Test
+    public void testExecutor() throws InterruptedException {
+        AtomicInteger successCount = new AtomicInteger(0);
+        AtomicInteger pendingCount = new AtomicInteger(0);
+
+        IExecutorService executor = liteMember.getHazelcastInstance().getExecutorService("executor");
+        long start = System.nanoTime();
+        System.out.println("Starting benchmark");
+
+        ExecutionCallback callback = new ExecutionCallback<Integer>() {
+            @Override
+            public void onResponse(Integer response) {
+                successCount.incrementAndGet();
+                pendingCount.decrementAndGet();
+            }
+
+            @Override
+            public void onFailure(Throwable t) {
+
+            }
+        };
+        ForkJoinPool.commonPool().execute(() -> {
+            while (true) {
+                if (pendingCount.get() == 1_000) {
+                    LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(1));
+                    continue;
+                }
+                Member remoteMember = instance.getHazelcastInstance().getCluster().getLocalMember();
+                executor.submitToMember(new Sum(tuple2(10, 20)), remoteMember, callback);
+                pendingCount.incrementAndGet();
+            }
+        });
+
+        while (true) {
+            Thread.sleep(2_000);
+            int count = successCount.get();
+            double elapsed = (double) TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+            double reqPerSec = count / elapsed * 1000;
+            System.out.printf("%d: %,.3f req/sec\n", count, reqPerSec);
+        }
+    }
+
+    static class Sum implements Callable<Integer>, DataSerializable {
+        private Tuple2<Integer, Integer> request;
+
+        public Sum() {
+        }
+
+        public Sum(Tuple2<Integer, Integer> request) {
+            this.request = request;
+        }
+
+
+        @Override
+        public Integer call() throws Exception {
+            return request.f1() + request.f0();
+        }
+
+        @Override
+        public void writeData(ObjectDataOutput out) throws IOException {
+            out.writeObject(request);
+        }
+
+        @Override
+        public void readData(ObjectDataInput in) throws IOException {
+            request = in.readObject();
         }
     }
 }
