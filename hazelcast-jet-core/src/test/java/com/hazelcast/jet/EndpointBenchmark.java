@@ -42,13 +42,14 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 @SuppressWarnings("Duplicates")
 public class EndpointBenchmark {
 
+    public static final int PENDING_LIMIT = 1_000;
     private JetInstance instance;
     private JetInstance liteMember;
 
     @Before
     public void setup() {
         JetConfig memberConfig = new JetConfig();
-        memberConfig.getInstanceConfig().setCooperativeThreadCount(1);
+//        memberConfig.getInstanceConfig().setCooperativeThreadCount(1);
         NetworkConfig nwConfig = memberConfig.getHazelcastConfig().getNetworkConfig();
         nwConfig.getJoin().getMulticastConfig().setEnabled(false);
         nwConfig.getJoin().getTcpIpConfig().setEnabled(true);
@@ -122,7 +123,7 @@ public class EndpointBenchmark {
         IEndpoint<Tuple2<Integer, Integer>, Integer> endpoint = liteMember.getEndpoint("sum");
         ForkJoinPool.commonPool().execute(() -> {
             while (true) {
-                if (pendingCount.get() == 1_000) {
+                if (pendingCount.get() == PENDING_LIMIT) {
                     LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(1));
                     continue;
                 }
@@ -186,7 +187,7 @@ public class EndpointBenchmark {
         };
         ForkJoinPool.commonPool().execute(() -> {
             while (true) {
-                if (pendingCount.get() == 1_000) {
+                if (pendingCount.get() == PENDING_LIMIT) {
                     LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(1));
                     continue;
                 }
