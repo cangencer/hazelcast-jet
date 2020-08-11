@@ -14,9 +14,12 @@
 # What is Hazelcast Jet?
 
 [Hazelcast Jet](https://jet-start.sh/) is an open-source, in-memory,
-distributed data processing engine. You can use it to process both large
-volumes of real-time events and batches of potentially huge, static
-datasets.
+distributed stream and batch processing engine. You can use it to
+process large volumes of real-time events or huge batches of static
+datasets. To give a sense of scale, a single node of Jet has been proven
+to [aggregate 10 million events per
+second](https://jet-start.sh/blog/2020/08/05/gc-tuning-for-jet) with
+latency under 10 milliseconds.
 
 It provides a Java API to build stream and batch processing applications
 through the use of a [dataflow programming
@@ -40,11 +43,11 @@ JetInstance jet = Jet.bootstrappedInstance();
 
 Pipeline p = Pipeline.create();
 p.readFrom(Sources.files("/path/to/text-files"))
- .flatMap(line -> traverseArray(line.toLowerCase().split("\\W+")))
- .filter(word -> !word.isEmpty())
- .groupingKey(word -> word)
- .aggregate(counting()) 
- .writeTo(Sinks.logger());
+    .flatMap(line -> traverseArray(line.toLowerCase().split("\\W+")))
+    .filter(word -> !word.isEmpty())
+    .groupingKey(word -> word)
+    .aggregate(counting())
+    .writeTo(Sinks.logger());
 
 jet.newJob(p).join();
 ```
@@ -55,19 +58,19 @@ and then deploy the application to the cluster:
 bin/jet submit word-count.jar
 ```
 
-Another application, aggregating millions of sensor readings per
-second with 10 millisecond resolution from Kafka looks like the
+Another application which aggregates millions of sensor readings per
+second with 10-millisecond resolution from Kafka looks like the
 following:
 
 ```java
 Pipeline p = Pipeline.create();
 
 p.readFrom(KafkaSources.<String, Reading>kafka(kafkaProperties, "sensors"))
- .withTimestamps(event -> event.getValue().timestamp(), 10) // use event timestamp, allowed lag in ms
- .groupingKey(reading -> reading.sensorId())
- .window(sliding(1_000, 10)) // sliding window of 1s by 10ms
- .aggregate(averagingDouble(reading -> reading.temperature()))
- .writeTo(Sinks.logger());
+    .withTimestamps(event -> event.getValue().timestamp(), 10) // use event timestamp, allowed lag in ms
+    .groupingKey(reading -> reading.sensorId())
+    .window(sliding(1_000, 10)) // sliding window of 1s by 10ms
+    .aggregate(averagingDouble(reading -> reading.temperature()))
+    .writeTo(Sinks.logger());
 
 jet.newJob(p).join();
 ```
